@@ -1,3 +1,0 @@
-Flask installation: `sudo apt install python3-flask -y`
-Ruff installation: `sudo snap install ruff -y`
-Pytest installation: `sudo apt install python3-pytest -y`
