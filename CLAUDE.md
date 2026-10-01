@@ -23,7 +23,6 @@ Python Flask API for managing tasks and users.
 - Google-style docstrings are required on every function with "args:", "Returns: ", and "Raises: " sections that match "get_user" from @services/users.py
 - Raise only "AppError" subclasses from @utils/errors.py never raise raw exceptions
 - New tests must be put in @tests/test_tasks.py
-- When following the @install_commands.txt for tool installation always download tools using the -y flag so WSL does not ask for a Y/n confirmation
 
  
 ## Do not touch

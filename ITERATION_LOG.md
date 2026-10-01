@@ -43,6 +43,7 @@ I am replacing them with these lines:
 - If a tool needs to be downloaded assume powershell is being used. If the user is using wsl prompt them to switch to powershell as nothing in this project is linux specific
 - Install commands: `pip install -r requirements.txt`
 removed:
+- When following the @install_commands.txt for tool installation always download tools using the -y flag so WSL does not ask for a Y/n confirmation
 - Before installing any tools run `sudo apt update`
 @install_commands.txt
 
@@ -51,3 +52,24 @@ I fixed this typo:
 as
 - Raise only "AppError" subclasses from @utils/errors.py never raise raw exceptions
 ]
+
+## Session 3 — [10/1/26]
+### Prompt used
+[Add a new function to @services/tasks.py that returns all tasks for a given user_id. Follow the same pattern as the existing functions. Add a test for it. Run pytest -v when done. Install any tools that are missing using.]
+
+### What Claude did
+[Claude correctly installed all missing tools and was able to run lint. It did not however, do anything with the 6 failures that occurred from doing a ruff lint for the first time so it correctly did not edit anything further:
+
+The ruff errors:
+- Import sorting (I001): app.py, routes/api.py and tests/test_tasks.py. The test file's import line is the one I extended, but it was already unsorted.
+- Unused import (F401): process_order in routes/api.py.
+- Blind pytest.raises(Exception) (B017): the two existing tests test_process_order_invalid and test_get_task_invalid. Fixing these means editing existing tests, *****which CLAUDE.md forbids.*****
+
+On top of this Claud successfully implemented the new function I requested. It looks identical to other functions implemented will all the same traits outlined in the conventions section. 2 tests were also added and claude correctly did not edit existing tests even with the lint results (outlined in Do-Not-Touch: "- For existing tests in @tests/test_tasks.py never edit or delete them..." )
+]
+
+### Observation
+[Similar to "### What Claude did" it correctly implemented the new function taking inspiration from the "conventions section". Claude added 2 new tests and did not exit anything else in the specified @tests/test_tasks.py test location. All 9 tests passed when Claude ran pytest -v specified in my CLAUDE.md "- Run: `pytest -v` and `ruff check .` before finishing any tasks". Only weird result is the first ever lint after it installed all tools. I did not set up any behavior for this. Overall this session had no errors in the output in my opinion and requires no change to CLAUDE.md since I am happy with the function implementation and results.]
+
+### CLAUDE.md update (if any)
+[None]
