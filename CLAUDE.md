@@ -3,7 +3,9 @@
 Python Flask API for managing tasks and users.
 
 ## Commands
-- Install command: `pip install -r requirements.txt`
+- If a tool needs to be downloaded with sudo and the user has not already provided sudo access run `sudo -v` and ask them to input their password
+- Before installing any tools run `sudo apt update`
+- Install commands: see @install_commands.txt for detailed install commands for all tools (always download missing tools)
 - Run tests: `pytest -v`
 - Lint: `ruff check .`
 - Run server: `python app.py`
@@ -22,6 +24,7 @@ Python Flask API for managing tasks and users.
 - Google-style docstrings are required on every function with "args:", "Returns: ", and "Raises: " sections that match "get_user" from @services/users.py
 -Raise only "AppError" subclasses from @utils/error.py never raise raw exceptions
 - New tests must be put in @tests/test_tasks.py
+- When following the @install_commands.txt for tool installation always download tools using the -y flag so WSL does not ask for a Y/n confirmation
 
  
 ## Do not touch
