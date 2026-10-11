@@ -40,7 +40,7 @@ Note: SA-1-SA-3 are told not to write tests (SA-4 only), which overrides the CLA
 | Subagent # | SA-3: API layer |
 | Input | routes/api.py, services/users.py (SA-2's functions), CLAUDE.md |
 | Task | Add GET /users, GET /users/<id>/notifications, and PATCH /users/<id>/notifications as HTTP-only routes. |
-| Output | routes/api.py (modified). **result:** pytest -q -> _fill in_) |
+| Output | routes/api.py (modified). **result:** pytest -q -> 97 passed. git diff --stat showed only routes/api.py; routes call SA-2's functions by their exact hand-off names with no validation or try/except. Claude flagged that a PATCH body that isn't a JSON object (e.g. [] or null) won't return a clean 422 - a gap in the SA-2/SA-3 hand-off (see Divergence). |
 | Constraint | Edit only routes/api.py. Do not touch services/users.py, services/tasks.py, utils/errors.py, or tests/test_tasks.py. Do not modify existing task routes or get_user_route. No validation or try/except in routes; pass values to the service and let handle_app_error return errors. Do not write tests. |
 | Hand-off | GET /api/users -> 200, list of users (each with notification_pref). GET /api/users/<id>/notifications -> 200, {"user_id": id, "notification_pref": pref}. PATCH /api/users/<id>/notifications with body {"notification_pref": "email"} -> 200, same shape; invalid or missing value -> 422; unknown user -> 404. |
 
