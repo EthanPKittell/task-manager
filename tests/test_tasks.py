@@ -1,6 +1,7 @@
 import pytest
 from app import app
 from services.tasks import (
+    DEFAULT_PRIORITY,
     process_order,
     get_task,
     create_task,
@@ -221,3 +222,89 @@ def test_list_tasks_route_invalid_priority(priority):
     response = app.test_client().get(f"/api/tasks?priority={priority}")
     assert response.status_code == 422
     assert "error" in response.get_json()
+
+def test_create_task_default_priority_matches_constant() -> None:
+    result = create_task("Water plants", 1)
+    assert DEFAULT_PRIORITY == 3
+    assert result["priority"] == DEFAULT_PRIORITY
+    assert get_task(result["id"])["priority"] == DEFAULT_PRIORITY
+
+def test_create_task_default_priority_is_filterable() -> None:
+    task_id = create_task("Water plants", 1)["id"]
+    assert task_id in [task["id"] for task in list_tasks(3)]
+    assert task_id not in [task["id"] for task in list_tasks(1)]
+
+@pytest.mark.parametrize("priority", [0, 6, "3", 5.0])
+def test_create_task_invalid_priority_creates_nothing(priority) -> None:
+    count = len(list_tasks())
+    with pytest.raises(ValidationError):
+        create_task("Water plants", 1, priority)
+    assert len(list_tasks()) == count
+
+def test_create_task_invalid_priority_message() -> None:
+    with pytest.raises(ValidationError) as exc_info:
+        create_task("Water plants", 1, 9)
+    assert exc_info.value.status_code == 422
+    assert exc_info.value.message == "Invalid priority: must be an integer between 1 and 5"
+
+@pytest.mark.parametrize("priority", [0, 6, "high", "3", 2.5, True, None])
+def test_create_task_route_invalid_priority_types(priority) -> None:
+    response = app.test_client().post(
+        "/api/tasks", json={"title": "Water plants", "user_id": 1, "priority": priority}
+    )
+    assert response.status_code == 422
+    assert "error" in response.get_json()
+
+@pytest.mark.parametrize("priority", [0, 6, "3", 5.0])
+def test_update_task_invalid_priority_leaves_task_unchanged(priority) -> None:
+    task_id = create_task("Water plants", 1, 2)["id"]
+    with pytest.raises(ValidationError):
+        update_task(task_id, {"priority": priority})
+    assert get_task(task_id)["priority"] == 2
+    assert get_task(task_id)["title"] == "Water plants"
+
+def test_update_task_invalid_priority_with_valid_title_no_partial_update() -> None:
+    task_id = create_task("Water plants", 1, 2)["id"]
+    with pytest.raises(ValidationError):
+        update_task(task_id, {"priority": 9, "title": "Feed cat"})
+    assert get_task(task_id)["priority"] == 2
+    assert get_task(task_id)["title"] == "Water plants"
+
+@pytest.mark.parametrize("priority", [0, 6, "high", "3", 2.5, True])
+def test_update_task_route_invalid_priority_types(priority) -> None:
+    task_id = create_task("Water plants", 1, 2)["id"]
+    response = app.test_client().patch(f"/api/tasks/{task_id}", json={"priority": priority})
+    assert response.status_code == 422
+    assert "error" in response.get_json()
+    assert get_task(task_id)["priority"] == 2
+
+@pytest.mark.parametrize("priority", [1, 2, 3, 4, 5])
+def test_list_tasks_filter_each_valid_priority(priority) -> None:
+    task_id = create_task("Water plants", 1, priority)["id"]
+    result = list_tasks(priority)
+    assert all(task["priority"] == priority for task in result)
+    assert task_id in [task["id"] for task in result]
+
+def test_list_tasks_filter_excludes_other_priorities() -> None:
+    low_id = create_task("Water plants", 1, 2)["id"]
+    high_id = create_task("Feed cat", 1, 4)["id"]
+    low_ids = [task["id"] for task in list_tasks(2)]
+    high_ids = [task["id"] for task in list_tasks(4)]
+    assert low_id in low_ids
+    assert high_id not in low_ids
+    assert high_id in high_ids
+    assert low_id not in high_ids
+
+def test_list_tasks_filter_reflects_priority_update() -> None:
+    task_id = create_task("Water plants", 1, 2)["id"]
+    update_task(task_id, {"priority": 4})
+    assert task_id not in [task["id"] for task in list_tasks(2)]
+    assert task_id in [task["id"] for task in list_tasks(4)]
+
+def test_list_tasks_route_filter_matches_service() -> None:
+    task_id = create_task("Water plants", 1, 5)["id"]
+    response = app.test_client().get("/api/tasks?priority=5")
+    assert response.status_code == 200
+    ids = [task["id"] for task in response.get_json()]
+    assert task_id in ids
+    assert ids == [task["id"] for task in list_tasks(5)]
