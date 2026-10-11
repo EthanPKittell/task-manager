@@ -1,5 +1,5 @@
-from flask import Blueprint, jsonify, request
-from services.tasks import DEFAULT_PRIORITY, get_task, create_task, process_order
+from flask import Blueprint, Response, jsonify, request
+from services.tasks import DEFAULT_PRIORITY, get_task, create_task, process_order, update_task
 from services.users import get_user
 from utils.errors import AppError
 
@@ -18,6 +18,23 @@ def create_task_route():
     data = request.get_json()
     priority = data.get("priority", DEFAULT_PRIORITY)
     return jsonify(create_task(data["title"], data["user_id"], priority)), 201
+
+@api.route("/tasks/<int:task_id>", methods=["PATCH"])
+def update_task_route(task_id: int) -> Response:
+    """Update a task's priority and/or title from the JSON request body.
+
+    Args:
+        task_id: The unique identifier for the task.
+
+    Returns:
+        A JSON response containing the updated task record.
+
+    Raises:
+        NotFoundError: If no task exists with the given ID.
+        ValidationError: If the body has neither priority nor title, or either
+            value is invalid.
+    """
+    return jsonify(update_task(task_id, request.get_json()))
 
 @api.route("/users/<int:user_id>", methods=["GET"])
 def get_user_route(user_id):

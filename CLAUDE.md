@@ -6,7 +6,7 @@ Python Flask API for managing tasks and users.
 - If a tool needs to be downloaded assume powershell is being used. If the user is using wsl prompt them to switch to powershell as nothing in this project is linux specific
 - Install commands: `pip install -r requirements.txt`
 - Run tests: `pytest -v`
-- Lint: `ruff check .` ask the user how to handle each lint error if any occur
+- Lint: `ruff check .` Only fix lint errors caused by current session changes. Ask the user how to handle each new lint error if any occur.
 - Run server: `python app.py`
 - Run: `pytest -v` and `ruff check .` before finishing any tasks
 

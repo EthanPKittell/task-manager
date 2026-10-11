@@ -1,6 +1,12 @@
 import pytest
 from app import app
-from services.tasks import process_order, get_task, create_task, get_tasks_for_user
+from services.tasks import (
+    process_order,
+    get_task,
+    create_task,
+    get_tasks_for_user,
+    update_task,
+)
 from utils.errors import NotFoundError, ValidationError
 
 def test_process_order_valid():
@@ -80,5 +86,100 @@ def test_create_task_route_invalid_priority():
     response = app.test_client().post(
         "/api/tasks", json={"title": "Water plants", "user_id": 1, "priority": 9}
     )
+    assert response.status_code == 422
+    assert "error" in response.get_json()
+
+def test_update_task_priority_only():
+    task_id = create_task("Water plants", 1, 2)["id"]
+    result = update_task(task_id, {"priority": 5})
+    assert result["priority"] == 5
+    assert result["title"] == "Water plants"
+    assert get_task(task_id) == result
+
+def test_update_task_title_only():
+    task_id = create_task("Water plants", 1, 2)["id"]
+    result = update_task(task_id, {"title": "Feed cat"})
+    assert result["title"] == "Feed cat"
+    assert result["priority"] == 2
+    assert get_task(task_id) == result
+
+def test_update_task_priority_and_title():
+    task_id = create_task("Water plants", 1, 2)["id"]
+    result = update_task(task_id, {"priority": 4, "title": "Feed cat"})
+    assert result["priority"] == 4
+    assert result["title"] == "Feed cat"
+
+def test_update_task_unknown_task():
+    with pytest.raises(NotFoundError):
+        update_task(999, {"priority": 1})
+
+def test_update_task_no_fields():
+    task_id = create_task("Water plants", 1)["id"]
+    with pytest.raises(ValidationError):
+        update_task(task_id, {})
+
+@pytest.mark.parametrize("priority", [0, 6, -1, "high", 2.5, True, None])
+def test_update_task_invalid_priority(priority):
+    task_id = create_task("Water plants", 1)["id"]
+    with pytest.raises(ValidationError):
+        update_task(task_id, {"priority": priority})
+
+@pytest.mark.parametrize("title", ["", "   ", 123, None])
+def test_update_task_invalid_title(title):
+    task_id = create_task("Water plants", 1)["id"]
+    with pytest.raises(ValidationError):
+        update_task(task_id, {"title": title})
+
+def test_update_task_no_partial_update():
+    task_id = create_task("Water plants", 1, 2)["id"]
+    with pytest.raises(ValidationError):
+        update_task(task_id, {"priority": 5, "title": "   "})
+    assert get_task(task_id)["priority"] == 2
+    assert get_task(task_id)["title"] == "Water plants"
+
+def test_update_task_route_priority_only():
+    task_id = create_task("Water plants", 1, 2)["id"]
+    response = app.test_client().patch(f"/api/tasks/{task_id}", json={"priority": 5})
+    assert response.status_code == 200
+    assert response.get_json()["priority"] == 5
+    assert response.get_json()["title"] == "Water plants"
+
+def test_update_task_route_title_only():
+    task_id = create_task("Water plants", 1, 2)["id"]
+    response = app.test_client().patch(f"/api/tasks/{task_id}", json={"title": "Feed cat"})
+    assert response.status_code == 200
+    assert response.get_json()["title"] == "Feed cat"
+    assert response.get_json()["priority"] == 2
+
+def test_update_task_route_priority_and_title():
+    task_id = create_task("Water plants", 1, 2)["id"]
+    response = app.test_client().patch(
+        f"/api/tasks/{task_id}", json={"priority": 4, "title": "Feed cat"}
+    )
+    assert response.status_code == 200
+    assert response.get_json()["priority"] == 4
+    assert response.get_json()["title"] == "Feed cat"
+
+def test_update_task_route_unknown_task():
+    response = app.test_client().patch("/api/tasks/999", json={"priority": 1})
+    assert response.status_code == 404
+    assert "error" in response.get_json()
+
+def test_update_task_route_invalid_priority():
+    task_id = create_task("Water plants", 1)["id"]
+    response = app.test_client().patch(f"/api/tasks/{task_id}", json={"priority": 9})
+    assert response.status_code == 422
+    assert "error" in response.get_json()
+
+def test_update_task_route_null_priority():
+    task_id = create_task("Water plants", 1, 2)["id"]
+    response = app.test_client().patch(f"/api/tasks/{task_id}", json={"priority": None})
+    assert response.status_code == 422
+    assert "error" in response.get_json()
+    assert get_task(task_id)["priority"] == 2
+
+def test_update_task_route_neither_field():
+    task_id = create_task("Water plants", 1)["id"]
+    response = app.test_client().patch(f"/api/tasks/{task_id}", json={})
     assert response.status_code == 422
     assert "error" in response.get_json()

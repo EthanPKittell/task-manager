@@ -45,6 +45,21 @@ def get_tasks_for_user(user_id: int) -> list[dict]:
     get_user(user_id)
     return [task for task in TASKS.values() if task["user_id"] == user_id]
 
+def _validate_priority(priority: int) -> None:
+    """Check that a priority is an integer from 1 to 5.
+
+    Args:
+        priority: The priority value to check.
+
+    Returns:
+        None.
+
+    Raises:
+        ValidationError: If priority is not an integer from 1 to 5.
+    """
+    if isinstance(priority, bool) or not isinstance(priority, int) or not 1 <= priority <= 5:
+        raise ValidationError("priority", "must be an integer between 1 and 5")
+
 def create_task(title: str, user_id: int, priority: int = DEFAULT_PRIORITY) -> dict:
     """Create a new task.
 
@@ -62,8 +77,7 @@ def create_task(title: str, user_id: int, priority: int = DEFAULT_PRIORITY) -> d
     """
     if not title or not title.strip():
         raise ValidationError("title", "cannot be empty")
-    if isinstance(priority, bool) or not isinstance(priority, int) or not 1 <= priority <= 5:
-        raise ValidationError("priority", "must be an integer between 1 and 5")
+    _validate_priority(priority)
     get_user(user_id)
     new_id = max(TASKS.keys()) + 1
     TASKS[new_id] = {
@@ -74,3 +88,34 @@ def create_task(title: str, user_id: int, priority: int = DEFAULT_PRIORITY) -> d
         "priority": priority,
     }
     return TASKS[new_id]
+
+def update_task(task_id: int, updates: dict) -> dict:
+    """Update a task's priority and/or title.
+
+    Args:
+        task_id: The unique identifier for the task.
+        updates: The fields to change. May contain "priority", "title", or both.
+            A key that is absent leaves that field unchanged.
+
+    Returns:
+        The updated task record as a dictionary.
+
+    Raises:
+        NotFoundError: If no task exists with the given ID.
+        ValidationError: If neither priority nor title is provided, priority is
+            not an integer from 1 to 5, or title is empty.
+    """
+    task = get_task(task_id)
+    if not isinstance(updates, dict) or not ("priority" in updates or "title" in updates):
+        raise ValidationError("update", "must include priority or title")
+    if "priority" in updates:
+        _validate_priority(updates["priority"])
+    if "title" in updates:
+        title = updates["title"]
+        if not isinstance(title, str) or not title.strip():
+            raise ValidationError("title", "cannot be empty")
+    if "priority" in updates:
+        task["priority"] = updates["priority"]
+    if "title" in updates:
+        task["title"] = updates["title"]
+    return task
