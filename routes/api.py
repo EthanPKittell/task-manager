@@ -1,5 +1,5 @@
 from flask import Blueprint, Response, jsonify, request
-from services.tasks import DEFAULT_PRIORITY, get_task, create_task, process_order, update_task
+from services.tasks import DEFAULT_PRIORITY, get_task, create_task, list_tasks, process_order, update_task
 from services.users import get_user
 from utils.errors import AppError
 
@@ -12,6 +12,22 @@ def handle_app_error(e):
 @api.route("/tasks/<int:task_id>", methods=["GET"])
 def get_task_route(task_id):
     return jsonify(get_task(task_id))
+
+@api.route("/tasks", methods=["GET"])
+def list_tasks_route() -> Response:
+    """List all tasks, optionally filtered by the priority query parameter.
+
+    Args:
+        None.
+
+    Returns:
+        A JSON response containing a list of task records.
+
+    Raises:
+        ValidationError: If the priority query parameter is not an integer
+            from 1 to 5.
+    """
+    return jsonify(list_tasks(request.args.get("priority")))
 
 @api.route("/tasks", methods=["POST"])
 def create_task_route():

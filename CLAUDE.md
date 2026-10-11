@@ -23,6 +23,7 @@ Python Flask API for managing tasks and users.
 - Google-style docstrings are required on every function with "Args:", "Returns: ", and "Raises: " sections that match "get_user" from @services/users.py
 - Raise only "AppError" subclasses from @utils/errors.py never raise raw exceptions
 - New tests must be put in @tests/test_tasks.py
+- Test first for every feature or bug fix: write the new tests in @tests/test_tasks.py, run 'pytest -q' and confirm the new tests fail before editing any file in @services/ or @routes/, implement, running 'pytest -q' after each file edit, finish with a final 'pytest -v' run.
 
  
 ## Do not touch

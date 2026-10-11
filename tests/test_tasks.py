@@ -5,6 +5,7 @@ from services.tasks import (
     get_task,
     create_task,
     get_tasks_for_user,
+    list_tasks,
     update_task,
 )
 from utils.errors import NotFoundError, ValidationError
@@ -181,5 +182,42 @@ def test_update_task_route_null_priority():
 def test_update_task_route_neither_field():
     task_id = create_task("Water plants", 1)["id"]
     response = app.test_client().patch(f"/api/tasks/{task_id}", json={})
+    assert response.status_code == 422
+    assert "error" in response.get_json()
+
+def test_list_tasks_all():
+    result = list_tasks()
+    assert {1, 2, 3} <= {task["id"] for task in result}
+
+def test_list_tasks_filter_by_priority():
+    result = list_tasks(5)
+    ids = [task["id"] for task in result]
+    assert all(task["priority"] == 5 for task in result)
+    assert 3 in ids
+    assert 1 not in ids
+
+def test_list_tasks_string_priority():
+    assert list_tasks("5") == list_tasks(5)
+
+@pytest.mark.parametrize("priority", [0, 6, -1, "high", "2.5", "", "0", "6", 2.5, True])
+def test_list_tasks_invalid_priority(priority):
+    with pytest.raises(ValidationError):
+        list_tasks(priority)
+
+def test_list_tasks_route_all():
+    response = app.test_client().get("/api/tasks")
+    assert response.status_code == 200
+    assert {1, 2, 3} <= {task["id"] for task in response.get_json()}
+
+def test_list_tasks_route_filter_by_priority():
+    response = app.test_client().get("/api/tasks?priority=1")
+    assert response.status_code == 200
+    result = response.get_json()
+    assert all(task["priority"] == 1 for task in result)
+    assert 1 in [task["id"] for task in result]
+
+@pytest.mark.parametrize("priority", ["9", "abc", ""])
+def test_list_tasks_route_invalid_priority(priority):
+    response = app.test_client().get(f"/api/tasks?priority={priority}")
     assert response.status_code == 422
     assert "error" in response.get_json()
