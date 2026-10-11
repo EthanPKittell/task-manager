@@ -11,7 +11,7 @@ Note: SA-1-SA-3 are told not to write tests (SA-4 only), which overrides the CLA
 | Subagent # | SA-1: Data layer |
 | Input | services/users.py, CLAUDE.md |
 | Task | Add the notification_pref field to every user record with a default of "none" |
-| Output | services/users.py (modified). **result:** pytest -q -> _fill in_ |
+| Output | services/users.py (modified). **result:** pytest -q -> 97 passed. git diff --stat showed only services/users.py; no tests written, no new functions. |
 | Constraint | Edit only services/users.py. Do not touch routes/api.py, services/tasks.py, utils/errors.py, or tests/test_tasks.py. Do not add new functions; only add constants, update the USERS seed data, and update create_user. Do not write tests. |
 | Hand-off | Constants NOTIFICATION_PREFS = ("email", "sms", "none") and DEFAULT_NOTIFICATION_PREF = "none" in services/users.py; every USERS entry and every user from create_user has "notification_pref": "none". |
 
@@ -25,7 +25,7 @@ Note: SA-1-SA-3 are told not to write tests (SA-4 only), which overrides the CLA
 | Subagent # | SA-2: Service layer |
 | Input | services/users.py (with SA-1's constants), utils/errors.py, CLAUDE.md |
 | Task | Add service function to read, update, and list notification preferences with validation |
-| Output | services/users.py (modified). **result:** pytest -q -> _fill in_ |
+| Output | services/users.py (modified). **result:** pytest -q -> 97 passed. git diff --stat showed only services/users.py; signatures and error message match the hand-off exactly; no tests written. Small note: the new functions are not yet covered by tests until SA-4. |
 | Constraint | Edit only services/users.py. Do not touch routes/api.py, services/tasks.py, utils/errors.py, or tests/test_tasks.py. Do not change get_user, create_user, the USERS seed data, or SA-1's constants. Never return HTTP responses or status codes; raise ValidationError / NotFoundError from utils/errors.py. Do not write any tests. |
 | Hand-off | get_notification_pref(user_id: int) -> str; update_notification_pref(user_id: int, pref: str) -> dict (returns the updated user); list_users() -> list[dict]. Invalid pref (anything not in NOTIFICATION_PREFS, including None, non-strings, "EMAIL") raises ValidationError("notification_pref", "must be one of: email, sms, none"). Unknown user raises NotFoundError via get_user. |
 
