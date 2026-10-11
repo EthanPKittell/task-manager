@@ -1,8 +1,11 @@
 from utils.errors import NotFoundError, ValidationError
 
+NOTIFICATION_PREFS = ("email", "sms", "none")
+DEFAULT_NOTIFICATION_PREF = "none"
+
 USERS: dict[int, dict] = {
-    1: {"id": 1, "name": "Alice", "email": "alice@example.com"},
-    2: {"id": 2, "name": "Bob",   "email": "bob@example.com"},
+    1: {"id": 1, "name": "Alice", "email": "alice@example.com", "notification_pref": "none"},
+    2: {"id": 2, "name": "Bob",   "email": "bob@example.com",   "notification_pref": "none"},
 }
 
 def get_user(user_id: int) -> dict:
@@ -39,5 +42,10 @@ def create_user(name: str, email: str) -> dict:
     if not email or "@" not in email:
         raise ValidationError("email", "must be a valid email address")
     new_id = max(USERS.keys()) + 1
-    USERS[new_id] = {"id": new_id, "name": name, "email": email}
+    USERS[new_id] = {
+        "id": new_id,
+        "name": name,
+        "email": email,
+        "notification_pref": DEFAULT_NOTIFICATION_PREF,
+    }
     return USERS[new_id]
