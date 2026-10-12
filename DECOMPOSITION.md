@@ -40,7 +40,7 @@ Note: SA-1-SA-3 are told not to write tests (SA-4 only), which overrides the CLA
 | Subagent # | SA-3: API layer |
 | Input | routes/api.py, services/users.py (SA-2's functions), CLAUDE.md |
 | Task | Add GET /users, GET /users/<id>/notifications, and PATCH /users/<id>/notifications as HTTP-only routes. |
-| Output | routes/api.py (modified). **result:** pytest -q -> 97 passed. git diff --stat showed only routes/api.py; routes call SA-2's functions by their exact hand-off names with no validation or try/except. Claude flagged that a PATCH body that isn't a JSON object (e.g. [] or null) won't return a clean 422 - a gap in the SA-2/SA-3 hand-off (see Divergence). |
+| Output | routes/api.py (modified). **result:** pytest -q -> 97 passed. git diff --stat was showing only changes to routes/api.py; routes call SA-2's functions by their exact hand-off names with no validation or try/except. Claude flagged that a PATCH body that isn't a JSON object (e.g. [] or null) won't return a clean 422 - a gap in the SA-2/SA-3 hand-off (see Divergence). |
 | Constraint | Edit only routes/api.py. Do not touch services/users.py, services/tasks.py, utils/errors.py, or tests/test_tasks.py. Do not modify existing task routes or get_user_route. No validation or try/except in routes; pass values to the service and let handle_app_error return errors. Do not write tests. |
 | Hand-off | GET /api/users -> 200, list of users (each with notification_pref). GET /api/users/<id>/notifications -> 200, {"user_id": id, "notification_pref": pref}. PATCH /api/users/<id>/notifications with body {"notification_pref": "email"} -> 200, same shape; invalid or missing value -> 422; unknown user -> 404. |
 
@@ -53,7 +53,7 @@ Note: SA-1-SA-3 are told not to write tests (SA-4 only), which overrides the CLA
 | Subagent # | SA-4: tests |
 | Input | tests/test_tasks.py, services/users.py, routes/api.py, CLAUDE.md |
 | Task | Append service and route tests for the notification preference feature. |
-| Output | tests/test_tasks.py (appended). **results:** pytest -q -> _fill in_ |
+| Output | tests/test_tasks.py (appended). **results:** pytest -q -> 128 passed (97 existing + the 31 new ones). git diff showed only tests/test_tasks.py: 138 lines added, 0 removed, no existing tests edited. All new tests passed on the first run, so the stop and report rule never triggered. Claude disclosed one change beyond a pure append: a new `from services.users import (...)` block at the top of the file. |
 | Constraint | Edit only tests/test_tasks.py; append only, never edit or delete existing tests. Do not touch services/, routes/, or utils/. If a new test fails, stop and report it; do not change app code or weaken the test without my approval. Match the existing bare tests style. |
 | Hand-off | (Final subagent) Full suite green; test names listed in the summary.  |
 
@@ -61,4 +61,15 @@ Note: SA-1-SA-3 are told not to write tests (SA-4 only), which overrides the CLA
 > SA-4 (tests). Append tests to tests/test_tasks.py only, matching the existing bare style. Cover: seed users and newly created users default to "none"; get_notification_pref and update_notification_pref for each valid value; invald values ("push", "", "EMAIL", None, 1) raise ValidationError and leave the pref unchanged; unknown user raises NotFoundError; list_users includes notification_pref; routes: GET /api/users, GET /api/users/<id> includes notification_pref, GET and PATCH /api/users/<id>/notifications (200, 422 for invalid or missing value, 404 for unknown user). Tests share module state, so restore any user pref you change or use membership assertions. Do not edit existing tests or touch services/, routes/, or utils/. If a new test fails, stop and report it; do not change app code. Run pytest -q, then pytest -v, then ruff check . and ask before fixing any new lint error.
 
 ## Divergence
-_(fill in after running)_
+
+**Did claude follow the constraint field for every subagent? If not, which constraint was violated and what did Claude do instead?**
+Yes for the file boundaries they were followed. Every subagent was committed separately and 'git diff --stat' shows SA-1 and SA-2 only touched services/users.py, SA-3 only touched routes/api.py, and SA-4 only touched tests/test_tasks.py. SA-1 through SA-3 also followed the "do not write tests" rule that went above what CLAUDE.md says for "Test first for every feature or bug fix". One exception: SA-4's constraint said to "append only" but it added a "from services.users import (...)" at the top of tests/test_tasks.py. This was needed for the tests to run, and Claude disclossed it, but it shows that my constraint was not worded too literally. 
+
+**Did any subagent's output break the next subagent's assumption? How did you recover?**
+Nothing broke outright but SA-3 used SA-2's exact function names and return values , and SA-4's 31 new tests passed on the first run. But the SA-2 to SA-3 hand-off left a bit of a gap. SA-2's update_notification_pref only takes "pref", so reading the request body has to happen in the route, while SA-3's constraint said "no validation in routes." SA-3 flagged that as non-object body wouldn't return a clean 422.
+
+**Would you write the decomposition differently a second time? What would you change?**
+First, I would define the edge case in the SA-3 hand-off: "a body that is not a JSON object returns 422," allowing "request.get_json(silent=True) or {}" as HTTP parsing rather than validation, and then add a matching case to SA-4.
+Secondly, I would reconsider tests being last. After SA-1 to SA-3 saying "97 passed" provided nothing regressed; the new functions had no coverage until SA-4 (SA-2 even noted this). Having every layer write its own tests would match my CLAUDE.md's test first rule and catch problems earlier.
+Thirdly, I would merge SA-1 and SA-2 into one sub agent. They edit the same file and their isolation doesn't have much benefit.
+Lastly, I would work "append only" as "append tests; adding imports is allowed."

@@ -9,6 +9,14 @@ from services.tasks import (
     list_tasks,
     update_task,
 )
+from services.users import (
+    NOTIFICATION_PREFS,
+    create_user,
+    get_notification_pref,
+    get_user,
+    list_users,
+    update_notification_pref,
+)
 from utils.errors import NotFoundError, ValidationError
 
 def test_process_order_valid():
@@ -308,3 +316,133 @@ def test_list_tasks_route_filter_matches_service() -> None:
     ids = [task["id"] for task in response.get_json()]
     assert task_id in ids
     assert ids == [task["id"] for task in list_tasks(5)]
+
+def test_seed_users_default_notification_pref() -> None:
+    assert get_user(1)["notification_pref"] == "none"
+    assert get_user(2)["notification_pref"] == "none"
+
+def test_create_user_default_notification_pref() -> None:
+    result = create_user("Carol", "carol@example.com")
+    assert result["notification_pref"] == "none"
+    assert get_user(result["id"])["notification_pref"] == "none"
+    assert get_notification_pref(result["id"]) == "none"
+
+def test_get_notification_pref_seed_user() -> None:
+    assert get_notification_pref(1) == "none"
+
+@pytest.mark.parametrize("pref", ["email", "sms", "none"])
+def test_update_notification_pref_valid(pref) -> None:
+    user_id = create_user("Carol", "carol@example.com")["id"]
+    result = update_notification_pref(user_id, pref)
+    assert result["id"] == user_id
+    assert result["notification_pref"] == pref
+    assert get_notification_pref(user_id) == pref
+    assert get_user(user_id) == result
+
+def test_update_notification_pref_leaves_other_users_unchanged() -> None:
+    user_id = create_user("Carol", "carol@example.com")["id"]
+    other_id = create_user("Dave", "dave@example.com")["id"]
+    update_notification_pref(user_id, "email")
+    assert get_notification_pref(user_id) == "email"
+    assert get_notification_pref(other_id) == "none"
+
+@pytest.mark.parametrize("pref", ["push", "", "EMAIL", None, 1])
+def test_update_notification_pref_invalid(pref) -> None:
+    user_id = create_user("Carol", "carol@example.com")["id"]
+    update_notification_pref(user_id, "sms")
+    with pytest.raises(ValidationError):
+        update_notification_pref(user_id, pref)
+    assert get_notification_pref(user_id) == "sms"
+
+def test_update_notification_pref_invalid_message() -> None:
+    user_id = create_user("Carol", "carol@example.com")["id"]
+    with pytest.raises(ValidationError) as exc_info:
+        update_notification_pref(user_id, "push")
+    assert exc_info.value.status_code == 422
+    assert exc_info.value.message == "Invalid notification_pref: must be one of: email, sms, none"
+
+def test_get_notification_pref_unknown_user() -> None:
+    with pytest.raises(NotFoundError):
+        get_notification_pref(999)
+
+def test_update_notification_pref_unknown_user() -> None:
+    with pytest.raises(NotFoundError):
+        update_notification_pref(999, "email")
+
+def test_list_users_includes_notification_pref() -> None:
+    user_id = create_user("Carol", "carol@example.com")["id"]
+    update_notification_pref(user_id, "email")
+    result = list_users()
+    assert {1, 2, user_id} <= {user["id"] for user in result}
+    assert all(user["notification_pref"] in NOTIFICATION_PREFS for user in result)
+    assert {"id": user_id, "name": "Carol", "email": "carol@example.com", "notification_pref": "email"} in result
+
+def test_list_users_route() -> None:
+    user_id = create_user("Carol", "carol@example.com")["id"]
+    update_notification_pref(user_id, "sms")
+    response = app.test_client().get("/api/users")
+    assert response.status_code == 200
+    result = response.get_json()
+    assert {1, 2, user_id} <= {user["id"] for user in result}
+    assert all(user["notification_pref"] in NOTIFICATION_PREFS for user in result)
+    assert [user["notification_pref"] for user in result if user["id"] == user_id] == ["sms"]
+
+def test_get_user_route_includes_notification_pref() -> None:
+    response = app.test_client().get("/api/users/1")
+    assert response.status_code == 200
+    assert response.get_json()["id"] == 1
+    assert response.get_json()["notification_pref"] == "none"
+
+def test_get_user_route_reflects_updated_notification_pref() -> None:
+    user_id = create_user("Carol", "carol@example.com")["id"]
+    update_notification_pref(user_id, "email")
+    response = app.test_client().get(f"/api/users/{user_id}")
+    assert response.status_code == 200
+    assert response.get_json()["notification_pref"] == "email"
+
+def test_get_notification_pref_route() -> None:
+    user_id = create_user("Carol", "carol@example.com")["id"]
+    response = app.test_client().get(f"/api/users/{user_id}/notifications")
+    assert response.status_code == 200
+    assert response.get_json() == {"user_id": user_id, "notification_pref": "none"}
+
+def test_get_notification_pref_route_unknown_user() -> None:
+    response = app.test_client().get("/api/users/999/notifications")
+    assert response.status_code == 404
+    assert "error" in response.get_json()
+
+@pytest.mark.parametrize("pref", ["email", "sms", "none"])
+def test_update_notification_pref_route_valid(pref) -> None:
+    user_id = create_user("Carol", "carol@example.com")["id"]
+    response = app.test_client().patch(
+        f"/api/users/{user_id}/notifications", json={"notification_pref": pref}
+    )
+    assert response.status_code == 200
+    assert response.get_json() == {"user_id": user_id, "notification_pref": pref}
+    assert get_notification_pref(user_id) == pref
+
+@pytest.mark.parametrize("pref", ["push", "", "EMAIL", None, 1])
+def test_update_notification_pref_route_invalid(pref) -> None:
+    user_id = create_user("Carol", "carol@example.com")["id"]
+    update_notification_pref(user_id, "sms")
+    response = app.test_client().patch(
+        f"/api/users/{user_id}/notifications", json={"notification_pref": pref}
+    )
+    assert response.status_code == 422
+    assert "error" in response.get_json()
+    assert get_notification_pref(user_id) == "sms"
+
+def test_update_notification_pref_route_missing_value() -> None:
+    user_id = create_user("Carol", "carol@example.com")["id"]
+    update_notification_pref(user_id, "sms")
+    response = app.test_client().patch(f"/api/users/{user_id}/notifications", json={})
+    assert response.status_code == 422
+    assert "error" in response.get_json()
+    assert get_notification_pref(user_id) == "sms"
+
+def test_update_notification_pref_route_unknown_user() -> None:
+    response = app.test_client().patch(
+        "/api/users/999/notifications", json={"notification_pref": "email"}
+    )
+    assert response.status_code == 404
+    assert "error" in response.get_json()
