@@ -526,3 +526,27 @@ def test_get_task_unknown_task_raises_not_found() -> None:
         get_task(999)
     assert exc_info.value.status_code == 404
     assert exc_info.value.message == "Task not found"
+
+def test_get_user_unknown_user_raises_not_found() -> None:
+    with pytest.raises(NotFoundError) as exc_info:
+        get_user(999)
+    assert exc_info.value.status_code == 404
+    assert exc_info.value.message == "User not found"
+
+@pytest.mark.parametrize("name", ["", "   "])
+def test_create_user_empty_name_raises_validation_error(name) -> None:
+    count = len(list_users())
+    with pytest.raises(ValidationError) as exc_info:
+        create_user(name, "carol@example.com")
+    assert exc_info.value.status_code == 422
+    assert exc_info.value.message == "Invalid name: cannot be empty"
+    assert len(list_users()) == count
+
+@pytest.mark.parametrize("email", ["", "carol.example.com"])
+def test_create_user_invalid_email_raises_validation_error(email) -> None:
+    count = len(list_users())
+    with pytest.raises(ValidationError) as exc_info:
+        create_user("Carol", email)
+    assert exc_info.value.status_code == 422
+    assert exc_info.value.message == "Invalid email: must be a valid email address"
+    assert len(list_users()) == count
