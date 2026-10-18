@@ -12,6 +12,7 @@ BLOCKED_PATHS = [
     "migrations/",            #Migrations require human review
     ".env",                   #Secrets - hard block
     ".claude/settings.json",  #Hook config - agents must not self-modify
+    ".claude/hooks/",
 ]
 
 #Extension 1: destructive Bash commands (word-boundary / token-level regexes).
