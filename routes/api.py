@@ -1,5 +1,6 @@
 from flask import Blueprint, Response, jsonify, request
 from services.tasks import DEFAULT_PRIORITY, get_task, create_task, list_tasks, process_order, update_task
+from services.tags import create_tag
 from services.users import get_notification_pref, get_user, list_users, update_notification_pref
 from utils.errors import AppError
 
@@ -51,6 +52,22 @@ def update_task_route(task_id: int) -> Response:
             value is invalid.
     """
     return jsonify(update_task(task_id, request.get_json()))
+
+@api.route("/tags", methods=["POST"])
+def create_tag_route() -> tuple[Response, int]:
+    """Create a tag from the JSON request body.
+
+    Args:
+        None.
+
+    Returns:
+        A JSON response containing the new tag record, with status 201.
+
+    Raises:
+        ValidationError: If the body is not a JSON object, or name is missing,
+            empty, or not a string.
+    """
+    return jsonify(create_tag(request.get_json())), 201
 
 @api.route("/users", methods=["GET"])
 def list_users_route() -> Response:

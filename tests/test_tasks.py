@@ -18,6 +18,7 @@ from services.users import (
     list_users,
     update_notification_pref,
 )
+from services.tags import create_tag
 from utils.errors import NotFoundError, ValidationError
 
 def test_process_order_valid():
@@ -484,3 +485,44 @@ def test_get_tasks_by_status_invalid(status) -> None:
         get_tasks_by_status(status)
     assert exc_info.value.status_code == 422
     assert exc_info.value.message == "Invalid status: must be one of: done, pending"
+
+def test_create_tag_valid() -> None:
+    result = create_tag({"name": "errands"})
+    assert result["name"] == "errands"
+    assert isinstance(result["id"], int)
+    assert create_tag({"name": "work"})["id"] == result["id"] + 1
+
+@pytest.mark.parametrize("data", [[], "errands", None, 1, {}, {"name": ""}, {"name": "   "}, {"name": 123}, {"name": None}])
+def test_create_tag_invalid(data) -> None:
+    with pytest.raises(ValidationError) as exc_info:
+        create_tag(data)
+    assert exc_info.value.status_code == 422
+
+def test_create_tag_invalid_message() -> None:
+    with pytest.raises(ValidationError) as exc_info:
+        create_tag({"name": "   "})
+    assert exc_info.value.message == "Invalid name: cannot be empty"
+
+def test_create_tag_route_valid() -> None:
+    response = app.test_client().post("/api/tags", json={"name": "errands"})
+    assert response.status_code == 201
+    body = response.get_json()
+    assert body["name"] == "errands"
+    assert isinstance(body["id"], int)
+
+def test_create_tag_route_non_object_body() -> None:
+    response = app.test_client().post("/api/tags", json=[])
+    assert response.status_code == 422
+    assert "error" in response.get_json()
+
+@pytest.mark.parametrize("body", [{}, {"name": ""}, {"name": 123}])
+def test_create_tag_route_invalid_name(body) -> None:
+    response = app.test_client().post("/api/tags", json=body)
+    assert response.status_code == 422
+    assert "error" in response.get_json()
+
+def test_get_task_unknown_task_raises_not_found() -> None:
+    with pytest.raises(NotFoundError) as exc_info:
+        get_task(999)
+    assert exc_info.value.status_code == 404
+    assert exc_info.value.message == "Task not found"
