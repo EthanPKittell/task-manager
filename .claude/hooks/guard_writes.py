@@ -73,6 +73,27 @@ def check_bash(command: str) -> tuple[bool, str]:
     return False, ""
 
 
+#Vector 2 fix: shell operations that create or modify files.
+WRITE_OPS = re.compile(
+    r">|\btee\b|\bsed\s+(-\w*\s+)*-i|\b(cp|mv|rm|touch|mkdir|truncate|dd)\b"
+    r"|write_text|write_bytes|open\([^)]*['\"][wax+]|Set-Content|Add-Content|Out-File|New-Item",
+    re.IGNORECASE,
+)
+
+
+def bash_writes_protected(command: str) -> tuple[bool, str]:
+    """Return (blocked, reason) if a Bash command writes to a protected path."""
+    cmd = command.replace("\\", "/").casefold()
+    cmd = re.sub(r"\d*>&\d|\d*>\s*/dev/null", " ", cmd)  #2>&1, >/dev/null are not file writes
+    if not WRITE_OPS.search(cmd):
+        return False, ""
+    for pattern in BLOCKED_PATHS:
+        name = re.escape(pattern.casefold().rstrip("/"))
+        if re.search(rf"(?<![\w.-]){name}(?![\w-])", cmd):
+            return True, f"Bash write to protected path: {pattern}"
+    return False, ""
+
+
 def new_content(tool: str, tool_input: dict) -> str:
     """Return the text a Write/Edit/MultiEdit call is about to put into the file."""
     if tool == "Write":
@@ -94,7 +115,10 @@ def main() -> None:
     tool_input = payload.get("tool_input", {})
 
     if tool == "Bash":
-        blocked, reason = check_bash(tool_input.get("command", ""))
+        command = tool_input.get("command", "")
+        blocked, reason = check_bash(command)
+        if not blocked:
+            blocked, reason = bash_writes_protected(command)  #Vector 2 fix
         if blocked:
             block([f"BLOCKED: {reason}.", "Run this yourself outside Claude if it is really needed."])
         sys.exit(0)
