@@ -12,11 +12,15 @@ AppError to JSON via handle_app_error, so routes never catch errors.
 ## Constraints
 - If a function already raises only AppError subclasses correctly, skip it - do not rewrite, reformat,
 or "improve" it. Report it as "no change needed".
-- Only edit $ARGUMENTS. Do not modify utils/errors.py, routes/api.py, or services/users.py (unless it is $ARGUMENTS).
+- Only edit $ARGUMENTS, plus append new tests to tests/test_tasks.py. Touch no other file. Do not modify
+utils/errors.py, routes/api.py, or services/users.py (unless it is $ARGUMENTS).
+- For each function you change, follow CLAUDE.md test-first: append a test to tests/test_tasks.py that expects the AppError,
+confirm it fails, then fix the function. Never edit or delete existing tests.
 - Do not add new AppError subclasses - use only the existing ones.
 -Preserve all function signatures, seed data, and constants.
 
 ## Verification
-Run "pytest -q" after every function you change; all tests must pass before moving to the next function. Finish with
-"pytest -v" and "git diff --stat", and confirm only $ARGUMENTS changed. List each function as "changed" or "no change
-needed".
+For each function you change: run pytest -q after the failing test is added (expect 1 failure),
+then again after the fix (expect all pass), and print the pytest -q summary line both times
+before moving to the next function. Finish with pytest -v and git diff --stat; confirm only
+$ARGUMENTS and tests/test_tasks.py changed. List each function as "changed" or "no change needed".

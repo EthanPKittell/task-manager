@@ -446,3 +446,11 @@ def test_update_notification_pref_route_unknown_user() -> None:
     )
     assert response.status_code == 404
     assert "error" in response.get_json()
+
+def test_process_order_unknown_task_raises_not_found() -> None:
+    with pytest.raises(NotFoundError):
+        process_order(999)
+
+def test_create_task_non_string_title_raises_validation_error() -> None:
+    with pytest.raises(ValidationError):
+        create_task(123, 1)

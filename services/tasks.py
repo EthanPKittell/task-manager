@@ -10,6 +10,19 @@ TASKS: dict[int, dict] = {
 }
 
 def process_order(task_id: int) -> dict:
+    """Mark a task as done.
+
+    Args:
+        task_id: The unique identifier for the task.
+
+    Returns:
+        The updated task record as a dictionary.
+
+    Raises:
+        NotFoundError: If no task exists with the given ID.
+    """
+    if task_id not in TASKS:
+        raise NotFoundError("Task")
     task = TASKS[task_id]
     task["done"] = True
     return task
@@ -95,10 +108,11 @@ def create_task(title: str, user_id: int, priority: int = DEFAULT_PRIORITY) -> d
         The newly created task record.
 
     Raises:
-        ValidationError: If title is empty or priority is not an integer from 1 to 5.
+        ValidationError: If title is empty or not a string, or priority is not an
+            integer from 1 to 5.
         NotFoundError: If no user exists with the given ID.
     """
-    if not title or not title.strip():
+    if not isinstance(title, str) or not title.strip():
         raise ValidationError("title", "cannot be empty")
     _validate_priority(priority)
     get_user(user_id)
