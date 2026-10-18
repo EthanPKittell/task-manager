@@ -1,0 +1,26 @@
+# PA5 Retrospective
+
+## 1.Plan Mode value
+Where did amending a plan prevent a problem that would have required a revert? Cite the
+session number from PLAN_LOG.md.
+
+The clearest case of an amendment preventing a revert was from session 2 in PLAN_LOG.md (PATCH/tasks/{id}). Claude's first plan declared "update_task(task_id: int, priority: int, title: str | None = None), which made priority required, so a PATCH that only changed the title would have returned 422. Because I caught this in the plan, I amended it to standard PATCH semantics before any code was created: both fields optional, returning 422 only when neither is sent, and an explicit "'priority': null" still rejected. Claude redesigned the signatures as update_task(task_id, updates: dict) so it could tell a missing key from just a null value. If I had approved the first plan then fixing it afterward would have meant reverting the service signature in services/tasks.py, the route in routes/api.py, and most of the 24 tests that were written against it. Session 1 is a smaller example the plan gave every seed task priority 3, this would have made the session 3 filter tests meaningless (?priority=3 returns everything, ?priority=1 would return nothing). Changing the seeds to 1, 3, and 5 in the plan avoided rewriting those tests later. 
+ 
+## 2.Plan Mode limits
+Describe the one case where the output did not match the amended plan. What does that
+tell you about the reliability boundary of Plan Mode?
+
+The case where the output did not match the amended plan was Session 3 (GET /tasks?priority). I had amended the plan to run "pytest -q" after each file edit, and the approved plan listed four runs: after the tests, after services/tasks.py, after routes/api.py, and a final "pytest -v once everything was done. Claude did only the first three, and the results matched the plan's prediction exactly. It then reported success without the final pytest -v, and it also ran an unplanned "ruff check ." baseline before writing any tests. The skipped step was one Claude had written into its own approved plan, and it was dropped once the goal looked met. This shows the reliablity boundary: approving a plan does not mean it will be executed exactly to it. The plan is context that Claude weighs against "the task is done" and the only reason I caught the gap was after reading the automode transcript and counting the test runs. Session 3 and 4 showed a second limit. Both plans included steps to "fix only lint errors from this change" which paraphrased the first sentence of my CLAUDE.md lint rule ("Only fix lint errors caused by current session changes. Ask the user how to handle each new lint error"). That rule contradicted itself, so a plan is only as reliable as the context it is build from. I had to amend the same step twice before rewritting the rule in CLAUDE.md.
+
+## 3.Subagent value
+Which subagent boundary was most important to enforce? Why? What would have
+happened if you had let Claude implement the feature in a single session?
+
+The most important subagent boundary in Task 2 was between SA-2 (services/users.py) and SA-3 (routes/api.py), enforced by SA-3's constraint "Edit only routes/api.py ...no validation or try/except in routes" because SA-3 could not touch the service or add validation, it showed a gap in my hand off instead of hiding it. SA-2's update_notification_pref(user_id, pref) only takes the value so the route has to read the request body, and SA-3 flagged that a body that isn't a JSON object "will not produce a clean 422." I confirmed this manually using curl: PATCH /api/users/1/notifications returns 422 for "{}" and 500 for "[]" or null. In a single session, Claude would most likely have quietly fixed this however it chose, by adding validation to the route, changing the service signature, or wrapping the call in try/except, and I would never have seen this decision. My git commits also made each subagent boundary very easily checkable with "git diff --stat": SA-1 and SA-2 touched only services/users.py, SA-3 only routes/api.py, and SA-4 only tests/tes_tasks.py. A single session would have given me changes for all of these files with no way to tell which step caused what.
+
+## 4.Gap analysis
+Both techniques are advisory (~80% reliable). Name the specific rule or constraint from Task
+2 that you would most want to enforce mechanically. Describe in one sentence what a hook
+that enforces it would do.
+
+Both techniques are advisory (~80% reliable): the session 3 skipped test run and SA-4 editing the import block despite "append only" show that written rules bend when they conflict with the finishing task. The constraint from task 2 that I would most want to enforce mechanically is SA-3's "edit only routes/api.py; do not touch services/users.py" because that is where the pressure to break the boundary was highest: the hand-off gap amde editing the service the easiest fix. A PreToolUse hook on the Edit and Write tools would read the current subagent's allowed file list from ".claude/allowed_files.txt" and exit with code 2, blocking the call and telling Claude why, whenever the target "file_path" is not on the list, so during SA-3 any attempt to edit services/users.py is refused before it can happen.
