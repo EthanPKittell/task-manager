@@ -1,0 +1,1 @@
+Audit a services file and replace raw or unguarded exceptions with AppError subclasses from utils/errors.py
