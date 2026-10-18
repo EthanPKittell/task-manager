@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """PreToolUse hook: blocks writes to protected files and directories."""
-import json, sys, os
+import json
+import os
+import sys
 
 #Populated from CLAUDE.md "Do not touch" and DECOMPOSITION.md SA-1..SA-4 constraints.
 BLOCKED_PATHS = [

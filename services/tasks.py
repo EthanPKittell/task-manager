@@ -58,6 +58,23 @@ def get_tasks_for_user(user_id: int) -> list[dict]:
     get_user(user_id)
     return [task for task in TASKS.values() if task["user_id"] == user_id]
 
+def get_tasks_by_status(status: str) -> list[dict]:
+    """Retrieve all tasks with a given completion status.
+
+    Args:
+        status: The status to filter by, either "done" or "pending".
+
+    Returns:
+        A list of task records with the given status. Empty if no tasks match.
+
+    Raises:
+        ValidationError: If status is not "done" or "pending".
+    """
+    if not isinstance(status, str) or status not in ("done", "pending"):
+        raise ValidationError("status", "must be one of: done, pending")
+    done = status == "done"
+    return [task for task in TASKS.values() if task["done"] is done]
+
 def list_tasks(priority: int | str | None = None) -> list[dict]:
     """Retrieve all tasks, optionally filtered by priority.
 

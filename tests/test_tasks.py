@@ -5,6 +5,7 @@ from services.tasks import (
     process_order,
     get_task,
     create_task,
+    get_tasks_by_status,
     get_tasks_for_user,
     list_tasks,
     update_task,
@@ -454,3 +455,32 @@ def test_process_order_unknown_task_raises_not_found() -> None:
 def test_create_task_non_string_title_raises_validation_error() -> None:
     with pytest.raises(ValidationError):
         create_task(123, 1)
+
+def test_get_tasks_by_status_done() -> None:
+    done_id = process_order(create_task("Water plants", 1)["id"])["id"]
+    pending_id = create_task("Feed cat", 1)["id"]
+    ids = [task["id"] for task in get_tasks_by_status("done")]
+    assert all(task["done"] is True for task in get_tasks_by_status("done"))
+    assert done_id in ids
+    assert 3 in ids
+    assert pending_id not in ids
+
+def test_get_tasks_by_status_pending() -> None:
+    done_id = process_order(create_task("Water plants", 1)["id"])["id"]
+    pending_id = create_task("Feed cat", 1)["id"]
+    ids = [task["id"] for task in get_tasks_by_status("pending")]
+    assert all(task["done"] is False for task in get_tasks_by_status("pending"))
+    assert pending_id in ids
+    assert done_id not in ids
+
+def test_get_tasks_by_status_covers_all_tasks() -> None:
+    done = get_tasks_by_status("done")
+    pending = get_tasks_by_status("pending")
+    assert len(done) + len(pending) == len(list_tasks())
+
+@pytest.mark.parametrize("status", ["DONE", "complete", "", None, True, 1])
+def test_get_tasks_by_status_invalid(status) -> None:
+    with pytest.raises(ValidationError) as exc_info:
+        get_tasks_by_status(status)
+    assert exc_info.value.status_code == 422
+    assert exc_info.value.message == "Invalid status: must be one of: done, pending"
