@@ -43,14 +43,24 @@ def to_rel(file_path: str) -> str:
     return rel.replace("\\", "/")
 
 
+def path_key(file_path: str) -> str:
+    """Project-relative path folded to lower case for comparison.
+
+    Windows paths are case-insensitive, so Utils/errors.py is the same file as
+    utils/errors.py. Folding on every OS only ever blocks more, never less.
+    """
+    return to_rel(file_path).casefold()
+
+
 def is_blocked(file_path: str) -> tuple[bool, str]:
     """Return (blocked, reason) for the given file path."""
-    rel = to_rel(file_path)
+    key = path_key(file_path)
     for pattern in BLOCKED_PATHS:
+        folded = pattern.casefold()
         if pattern.endswith("/"):
-            if rel.startswith(pattern):
+            if key.startswith(folded):
                 return True, f"Protected directory: {pattern}"
-        elif rel == pattern:
+        elif key == folded:
             return True, f"Protected file: {pattern}"
     return False, ""
 
@@ -99,7 +109,7 @@ def main() -> None:
                f"To modify {file_path}, update CLAUDE.md and remove the",
                "protection after team review."])
 
-    if to_rel(file_path) in CONTENT_GUARDED and CONNECTION_STRING.search(new_content(tool, tool_input)):
+    if path_key(file_path) in [p.casefold() for p in CONTENT_GUARDED] and CONNECTION_STRING.search(new_content(tool, tool_input)):
         block([f"BLOCKED: hardcoded database connection string in {to_rel(file_path)}.",
                "Connection strings must come from environment variables,",
                'e.g. os.environ["DATABASE_URL"], never a postgresql:// or sqlite:/// literal.'])
