@@ -1,5 +1,5 @@
 from flask import Blueprint, Response, jsonify, request
-from services.tasks import DEFAULT_PRIORITY, get_task, create_task, list_tasks, process_order, update_task
+from services.tasks import DEFAULT_CATEGORY, DEFAULT_PRIORITY, get_task, create_task, list_tasks, process_order, update_task
 from services.tags import create_tag
 from services.users import get_notification_pref, get_user, list_users, update_notification_pref
 from utils.errors import AppError
@@ -34,7 +34,8 @@ def list_tasks_route() -> Response:
 def create_task_route():
     data = request.get_json()
     priority = data.get("priority", DEFAULT_PRIORITY)
-    return jsonify(create_task(data["title"], data["user_id"], priority)), 201
+    category = data.get("category", DEFAULT_CATEGORY)
+    return jsonify(create_task(data["title"], data["user_id"], priority, category)), 201
 
 @api.route("/tasks/<int:task_id>", methods=["PATCH"])
 def update_task_route(task_id: int) -> Response:

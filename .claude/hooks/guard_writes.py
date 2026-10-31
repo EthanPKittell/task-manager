@@ -115,7 +115,7 @@ def main() -> None:
     tool = payload.get("tool_name", "")
     tool_input = payload.get("tool_input", {})
 
-    if tool == "Bash":
+    if tool in ("Bash","PowerShell"):
         command = tool_input.get("command", "")
         blocked, reason = check_bash(command)
         if not blocked:
