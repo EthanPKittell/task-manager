@@ -575,3 +575,39 @@ def test_create_task_invalid_category(category) -> None:
     assert exc_info.value.status_code == 422
     assert exc_info.value.message == "Invalid category: must be one of: work, personal, other"
     assert len(list_tasks()) == count
+
+@pytest.mark.parametrize("category", ["work", "personal", "other"])
+def test_create_task_route_with_category(category) -> None:
+    response = app.test_client().post(
+        "/api/tasks", json={"title": "Water plants", "user_id": 1, "category": category}
+    )
+    assert response.status_code == 201
+    body = response.get_json()
+    assert body["category"] == category
+    assert get_task(body["id"])["category"] == category
+
+def test_create_task_route_default_category() -> None:
+    response = app.test_client().post(
+        "/api/tasks", json={"title": "Water plants", "user_id": 1}
+    )
+    assert response.status_code == 201
+    assert response.get_json()["category"] == "other"
+
+def test_create_task_route_with_priority_and_category() -> None:
+    response = app.test_client().post(
+        "/api/tasks",
+        json={"title": "Water plants", "user_id": 1, "priority": 5, "category": "personal"},
+    )
+    assert response.status_code == 201
+    assert response.get_json()["priority"] == 5
+    assert response.get_json()["category"] == "personal"
+
+@pytest.mark.parametrize("category", ["home", "", "WORK", None, 1, True])
+def test_create_task_route_invalid_category(category) -> None:
+    count = len(list_tasks())
+    response = app.test_client().post(
+        "/api/tasks", json={"title": "Water plants", "user_id": 1, "category": category}
+    )
+    assert response.status_code == 422
+    assert "error" in response.get_json()
+    assert len(list_tasks()) == count
