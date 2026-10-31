@@ -41,4 +41,11 @@ Python Flask API for managing tasks and users.
 - When a task is scoped to the API layer, do not edit @services/users.py or @services/tasks.py to make a route fit, and do not add validation or try/except to @routes/api.py. If a service signature doesn't cover a request case (e.g. a body that isn't a JSON object), stop and then report the gap.
 - Do not change the seed data (USERS in @services/users.py, TASKS in @services/tasks.py) or the constants NOTIFICATION_PREFS, DEFAULT_NOTIFICATION_PREF, and DEFAULT_PRIORITY unless the task explicitly asks; existing tests in @tests/test_tasks.py depend on them.
 
+## Git Conventions
+- Use conventional commits with one of these types: feat, fix, docs, refactor, test, chore (e.g. `feat: add category field to tasks`)
+- Write the subject in imperative mood and keep it under 72 characters
+- Run `pytest` before every commit
+- Name branches `feat/*`, `fix/*`, or `docs/*`
+- Never force-push to main
+
 

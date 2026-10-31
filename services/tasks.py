@@ -2,6 +2,8 @@ from services.users import get_user
 from utils.errors import NotFoundError, ValidationError
 
 DEFAULT_PRIORITY = 3
+TASK_CATEGORIES = ("work", "personal", "other")
+DEFAULT_CATEGORY = "other"
 
 TASKS: dict[int, dict] = {
     1: {"id": 1, "title": "Buy groceries",  "done": False, "user_id": 1, "priority": 1},
@@ -113,25 +115,32 @@ def _validate_priority(priority: int) -> None:
     if isinstance(priority, bool) or not isinstance(priority, int) or not 1 <= priority <= 5:
         raise ValidationError("priority", "must be an integer between 1 and 5")
 
-def create_task(title: str, user_id: int, priority: int = DEFAULT_PRIORITY) -> dict:
+def create_task(
+    title: str, user_id: int, priority: int = DEFAULT_PRIORITY, category: str = DEFAULT_CATEGORY
+) -> dict:
     """Create a new task.
 
     Args:
         title: The title of the task.
         user_id: The unique identifier for the user the task belongs to.
         priority: The priority of the task, from 1 to 5. Defaults to 3.
+        category: The category of the task, one of "work", "personal", or
+            "other". Defaults to "other".
 
     Returns:
         The newly created task record.
 
     Raises:
-        ValidationError: If title is empty or not a string, or priority is not an
-            integer from 1 to 5.
+        ValidationError: If title is empty or not a string, priority is not an
+            integer from 1 to 5, or category is not one of "work", "personal",
+            or "other".
         NotFoundError: If no user exists with the given ID.
     """
     if not isinstance(title, str) or not title.strip():
         raise ValidationError("title", "cannot be empty")
     _validate_priority(priority)
+    if not isinstance(category, str) or category not in TASK_CATEGORIES:
+        raise ValidationError("category", "must be one of: work, personal, other")
     get_user(user_id)
     new_id = max(TASKS.keys()) + 1
     TASKS[new_id] = {
@@ -140,6 +149,7 @@ def create_task(title: str, user_id: int, priority: int = DEFAULT_PRIORITY) -> d
         "done": False,
         "user_id": user_id,
         "priority": priority,
+        "category": category,
     }
     return TASKS[new_id]
 
