@@ -550,3 +550,28 @@ def test_create_user_invalid_email_raises_validation_error(email) -> None:
     assert exc_info.value.status_code == 422
     assert exc_info.value.message == "Invalid email: must be a valid email address"
     assert len(list_users()) == count
+
+def test_create_task_default_category() -> None:
+    result = create_task("Water plants", 1)
+    assert result["category"] == "other"
+    assert get_task(result["id"])["category"] == "other"
+
+@pytest.mark.parametrize("category", ["work", "personal", "other"])
+def test_create_task_with_category(category) -> None:
+    result = create_task("Water plants", 1, category=category)
+    assert result["category"] == category
+    assert get_task(result["id"])["category"] == category
+
+def test_create_task_with_priority_and_category() -> None:
+    result = create_task("Water plants", 1, 5, "work")
+    assert result["priority"] == 5
+    assert result["category"] == "work"
+
+@pytest.mark.parametrize("category", ["home", "", "WORK", " work", None, 1, True])
+def test_create_task_invalid_category(category) -> None:
+    count = len(list_tasks())
+    with pytest.raises(ValidationError) as exc_info:
+        create_task("Water plants", 1, category=category)
+    assert exc_info.value.status_code == 422
+    assert exc_info.value.message == "Invalid category: must be one of: work, personal, other"
+    assert len(list_tasks()) == count
