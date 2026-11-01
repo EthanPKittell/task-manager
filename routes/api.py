@@ -1,5 +1,5 @@
 from flask import Blueprint, Response, jsonify, request
-from services.tasks import DEFAULT_CATEGORY, DEFAULT_PRIORITY, get_task, create_task, list_tasks, process_order, update_task
+from services.tasks import DEFAULT_CATEGORY, DEFAULT_PRIORITY, archive_task, get_task, create_task, list_tasks, process_order, update_task
 from services.tags import create_tag
 from services.users import get_notification_pref, get_user, list_users, update_notification_pref
 from utils.errors import AppError
@@ -16,7 +16,9 @@ def get_task_route(task_id):
 
 @api.route("/tasks", methods=["GET"])
 def list_tasks_route() -> Response:
-    """List all tasks, optionally filtered by the priority query parameter.
+    """List tasks, filtered by the priority and include_archived query parameters.
+
+    Archived tasks are left out unless include_archived=true.
 
     Args:
         None.
@@ -26,9 +28,29 @@ def list_tasks_route() -> Response:
 
     Raises:
         ValidationError: If the priority query parameter is not an integer
-            from 1 to 5.
+            from 1 to 5, or include_archived is not "true" or "false".
     """
-    return jsonify(list_tasks(request.args.get("priority")))
+    return jsonify(
+        list_tasks(
+            request.args.get("priority"),
+            include_archived=request.args.get("include_archived"),
+        )
+    )
+
+@api.route("/tasks/<int:task_id>/archive", methods=["POST"])
+def archive_task_route(task_id: int) -> Response:
+    """Archive a task.
+
+    Args:
+        task_id: The unique identifier for the task.
+
+    Returns:
+        A JSON response containing the archived task record.
+
+    Raises:
+        NotFoundError: If no task exists with the given ID.
+    """
+    return jsonify(archive_task(task_id))
 
 @api.route("/tasks", methods=["POST"])
 def create_task_route():

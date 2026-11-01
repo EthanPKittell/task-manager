@@ -78,28 +78,81 @@ def get_tasks_by_status(status: str) -> list[dict]:
     done = status == "done"
     return [task for task in TASKS.values() if task["done"] is done]
 
-def list_tasks(priority: int | str | None = None) -> list[dict]:
+def archive_task(task_id: int) -> dict:
+    """Mark a task as archived.
+
+    Args:
+        task_id: The unique identifier for the task.
+
+    Returns:
+        The updated task record as a dictionary.
+
+    Raises:
+        NotFoundError: If no task exists with the given ID.
+    """
+    task = get_task(task_id)
+    task["archived"] = True
+    return task
+
+def _parse_include_archived(value: bool | str | None) -> bool:
+    """Convert an include_archived value to a boolean.
+
+    Args:
+        value: True, False, None, or the string "true" or "false", such as a
+            raw query-string value. None means False.
+
+    Returns:
+        True if archived tasks should be included, otherwise False.
+
+    Raises:
+        ValidationError: If value is not True, False, None, "true", or "false".
+    """
+    if value is None:
+        return False
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str) and value in ("true", "false"):
+        return value == "true"
+    raise ValidationError("include_archived", "must be true or false")
+
+def list_tasks(
+    priority: int | str | None = None,
+    *,
+    include_archived: bool | str | None = None,
+) -> list[dict]:
     """Retrieve all tasks, optionally filtered by priority.
+
+    Archived tasks are left out unless include_archived is true. A task with
+    no "archived" key is treated as not archived.
 
     Args:
         priority: The priority to filter by, from 1 to 5. May be an integer or
-            a string of digits such as a raw query-string value. If None, all
-            tasks are returned.
+            a string of digits such as a raw query-string value. If None, tasks
+            of every priority are returned.
+        include_archived: Keyword-only. Whether to include archived tasks. May
+            be True, False, None, or the string "true" or "false". Defaults to
+            None, which means False.
 
     Returns:
-        A list of task records. Empty if no tasks match the given priority.
+        A list of task records. Empty if no tasks match.
 
     Raises:
-        ValidationError: If priority is not an integer from 1 to 5.
+        ValidationError: If priority is not an integer from 1 to 5, or
+            include_archived is not True, False, None, "true", or "false".
     """
-    if priority is None:
-        return list(TASKS.values())
-    if isinstance(priority, str):
-        if not (priority.isascii() and priority.isdigit()):
-            raise ValidationError("priority", "must be an integer between 1 and 5")
-        priority = int(priority)
-    _validate_priority(priority)
-    return [task for task in TASKS.values() if task["priority"] == priority]
+    include_archived = _parse_include_archived(include_archived)
+    if priority is not None:
+        if isinstance(priority, str):
+            if not (priority.isascii() and priority.isdigit()):
+                raise ValidationError("priority", "must be an integer between 1 and 5")
+            priority = int(priority)
+        _validate_priority(priority)
+    return [
+        task
+        for task in TASKS.values()
+        if (include_archived or not task.get("archived", False))
+        and (priority is None or task["priority"] == priority)
+    ]
 
 def _validate_priority(priority: int) -> None:
     """Check that a priority is an integer from 1 to 5.

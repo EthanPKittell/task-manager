@@ -2,6 +2,7 @@ import pytest
 from app import app
 from services.tasks import (
     DEFAULT_PRIORITY,
+    archive_task,
     process_order,
     get_task,
     create_task,
@@ -699,3 +700,98 @@ def test_create_task_too_many_tags_message() -> None:
     with pytest.raises(ValidationError) as exc_info:
         create_task("Water plants", 1, tags=["a", "b", "c", "d", "e", "f"])
     assert exc_info.value.message == "Invalid tags: must have at most 5 tags"
+
+def test_archive_task_marks_archived() -> None:
+    task_id = create_task("Water plants", 1)["id"]
+    result = archive_task(task_id)
+    assert result["id"] == task_id
+    assert result["archived"] is True
+    assert get_task(task_id) == result
+
+def test_archive_task_unknown_task() -> None:
+    with pytest.raises(NotFoundError) as exc_info:
+        archive_task(999)
+    assert exc_info.value.status_code == 404
+    assert exc_info.value.message == "Task not found"
+
+def test_archive_task_is_idempotent() -> None:
+    task_id = create_task("Water plants", 1)["id"]
+    archive_task(task_id)
+    result = archive_task(task_id)
+    assert result["archived"] is True
+    assert get_task(task_id)["archived"] is True
+
+def test_list_tasks_hides_archived_by_default() -> None:
+    archived_id = create_task("Water plants", 1)["id"]
+    active_id = create_task("Feed cat", 1)["id"]
+    archive_task(archived_id)
+    ids = {task["id"] for task in list_tasks()}
+    assert archived_id not in ids
+    assert active_id in ids
+    assert {1, 2, 3} <= ids
+
+def test_list_tasks_include_archived_true() -> None:
+    archived_id = create_task("Water plants", 1)["id"]
+    archive_task(archived_id)
+    ids = {task["id"] for task in list_tasks(include_archived=True)}
+    assert archived_id in ids
+    assert {1, 2, 3} <= ids
+
+def test_list_tasks_include_archived_with_priority() -> None:
+    archived_id = create_task("Water plants", 1, 4)["id"]
+    other_id = create_task("Feed cat", 1, 2)["id"]
+    archive_task(archived_id)
+    result = list_tasks(4, include_archived=True)
+    ids = [task["id"] for task in result]
+    assert all(task["priority"] == 4 for task in result)
+    assert archived_id in ids
+    assert other_id not in ids
+    assert archived_id not in [task["id"] for task in list_tasks(4)]
+
+@pytest.mark.parametrize(
+    "value, included",
+    [(True, True), ("true", True), (False, False), ("false", False), (None, False)],
+)
+def test_list_tasks_include_archived_values(value, included) -> None:
+    archived_id = create_task("Water plants", 1)["id"]
+    archive_task(archived_id)
+    ids = [task["id"] for task in list_tasks(include_archived=value)]
+    assert (archived_id in ids) is included
+
+@pytest.mark.parametrize("value", ["yes", "1", "", "TRUE", 1])
+def test_list_tasks_invalid_include_archived(value) -> None:
+    with pytest.raises(ValidationError) as exc_info:
+        list_tasks(include_archived=value)
+    assert exc_info.value.status_code == 422
+    assert exc_info.value.message == "Invalid include_archived: must be true or false"
+
+def test_archive_task_route() -> None:
+    task_id = create_task("Water plants", 1)["id"]
+    client = app.test_client()
+    response = client.post(f"/api/tasks/{task_id}/archive")
+    assert response.status_code == 200
+    assert response.get_json()["id"] == task_id
+    assert response.get_json()["archived"] is True
+    default_ids = [task["id"] for task in client.get("/api/tasks").get_json()]
+    assert task_id not in default_ids
+    all_ids = [task["id"] for task in client.get("/api/tasks?include_archived=true").get_json()]
+    assert task_id in all_ids
+
+def test_archive_task_route_unknown_task() -> None:
+    response = app.test_client().post("/api/tasks/999/archive")
+    assert response.status_code == 404
+    assert "error" in response.get_json()
+
+def test_list_tasks_route_include_archived_with_priority() -> None:
+    task_id = create_task("Water plants", 1, 4)["id"]
+    archive_task(task_id)
+    response = app.test_client().get("/api/tasks?priority=4&include_archived=true")
+    assert response.status_code == 200
+    result = response.get_json()
+    assert all(task["priority"] == 4 for task in result)
+    assert task_id in [task["id"] for task in result]
+
+def test_list_tasks_route_invalid_include_archived() -> None:
+    response = app.test_client().get("/api/tasks?include_archived=yes")
+    assert response.status_code == 422
+    assert "error" in response.get_json()
