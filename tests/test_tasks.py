@@ -1,4 +1,7 @@
+from datetime import date
+
 import pytest
+import services.tasks as tasks_service
 from app import app
 from services.tasks import (
     DEFAULT_PRIORITY,
@@ -699,3 +702,193 @@ def test_create_task_too_many_tags_message() -> None:
     with pytest.raises(ValidationError) as exc_info:
         create_task("Water plants", 1, tags=["a", "b", "c", "d", "e", "f"])
     assert exc_info.value.message == "Invalid tags: must have at most 5 tags"
+
+FIXED_TODAY = date(2026, 6, 15)
+PAST = "2026-06-14"
+DUE_TODAY = "2026-06-15"
+FUTURE = "2026-06-16"
+INVALID_DUE_DATES = ["2026-02-30", "2026/06/15", "20260615", "2026-6-15", "", "tomorrow", 20260615, True]
+DUE_DATE_MESSAGE = "Invalid due_date: must be a date in YYYY-MM-DD format"
+NO_FIELDS_MESSAGE = "Invalid update: must include priority or title"
+
+def _ids(tasks: list[dict]) -> set[int]:
+    return {task["id"] for task in tasks}
+
+def test_create_task_default_due_date() -> None:
+    result = create_task("Water plants", 1)
+    assert result["due_date"] is None
+    assert get_task(result["id"])["due_date"] is None
+
+def test_create_task_with_due_date() -> None:
+    result = create_task("Water plants", 1, due_date="2026-07-01")
+    assert result["due_date"] == "2026-07-01"
+    assert get_task(result["id"])["due_date"] == "2026-07-01"
+
+@pytest.mark.parametrize("due_date", INVALID_DUE_DATES)
+def test_create_task_invalid_due_date(due_date) -> None:
+    count = len(list_tasks())
+    with pytest.raises(ValidationError) as exc_info:
+        create_task("Water plants", 1, due_date=due_date)
+    assert exc_info.value.status_code == 422
+    assert exc_info.value.message == DUE_DATE_MESSAGE
+    assert len(list_tasks()) == count
+
+def test_update_task_due_date_only() -> None:
+    task_id = create_task("Water plants", 1, 2)["id"]
+    result = update_task(task_id, {"due_date": "2026-07-01"})
+    assert result["due_date"] == "2026-07-01"
+    assert result["priority"] == 2
+    assert result["title"] == "Water plants"
+    assert get_task(task_id) == result
+
+def test_update_task_due_date_none_clears() -> None:
+    task_id = create_task("Water plants", 1, due_date="2026-07-01")["id"]
+    result = update_task(task_id, {"due_date": None})
+    assert result["due_date"] is None
+    assert get_task(task_id)["due_date"] is None
+
+@pytest.mark.parametrize("due_date", INVALID_DUE_DATES)
+def test_update_task_invalid_due_date_leaves_task_unchanged(due_date) -> None:
+    task_id = create_task("Water plants", 1, 2, due_date="2026-07-01")["id"]
+    with pytest.raises(ValidationError) as exc_info:
+        update_task(task_id, {"due_date": due_date})
+    assert exc_info.value.status_code == 422
+    assert exc_info.value.message == DUE_DATE_MESSAGE
+    assert get_task(task_id)["due_date"] == "2026-07-01"
+
+def test_update_task_invalid_due_date_with_valid_priority_no_partial_update() -> None:
+    task_id = create_task("Water plants", 1, 2, due_date="2026-07-01")["id"]
+    with pytest.raises(ValidationError):
+        update_task(task_id, {"priority": 5, "due_date": "2026-02-30"})
+    assert get_task(task_id)["priority"] == 2
+    assert get_task(task_id)["due_date"] == "2026-07-01"
+
+@pytest.mark.parametrize("updates", [{}, {"foo": 1}])
+def test_update_task_no_accepted_fields_message(updates) -> None:
+    task_id = create_task("Water plants", 1)["id"]
+    with pytest.raises(ValidationError) as exc_info:
+        update_task(task_id, updates)
+    assert exc_info.value.message == NO_FIELDS_MESSAGE
+
+def test_list_tasks_overdue_is_keyword_only() -> None:
+    with pytest.raises(TypeError):
+        list_tasks(2, True)
+
+def test_list_tasks_overdue_true() -> None:
+    past_id = create_task("Water plants", 1, due_date=PAST)["id"]
+    today_id = create_task("Feed cat", 1, due_date=DUE_TODAY)["id"]
+    future_id = create_task("Call mom", 1, due_date=FUTURE)["id"]
+    done_id = process_order(create_task("Pay rent", 1, due_date=PAST)["id"])["id"]
+    no_date_id = create_task("Read book", 1)["id"]
+    ids = _ids(list_tasks(overdue=True, today=FIXED_TODAY))
+    assert past_id in ids
+    assert today_id not in ids
+    assert future_id not in ids
+    assert done_id not in ids
+    assert no_date_id not in ids
+    assert not {1, 2, 3} & ids
+
+def test_list_tasks_overdue_results_all_overdue() -> None:
+    create_task("Water plants", 1, due_date=PAST)
+    result = list_tasks(overdue=True, today=FIXED_TODAY)
+    assert result
+    for task in result:
+        assert task["done"] is False
+        assert date.fromisoformat(task["due_date"]) < FIXED_TODAY
+
+def test_list_tasks_overdue_false_is_complement() -> None:
+    past_id = create_task("Water plants", 1, due_date=PAST)["id"]
+    future_id = create_task("Feed cat", 1, due_date=FUTURE)["id"]
+    overdue = _ids(list_tasks(overdue=True, today=FIXED_TODAY))
+    not_overdue = _ids(list_tasks(overdue=False, today=FIXED_TODAY))
+    assert overdue.isdisjoint(not_overdue)
+    assert overdue | not_overdue == _ids(list_tasks())
+    assert past_id in overdue
+    assert future_id in not_overdue
+
+@pytest.mark.parametrize("raw, flag", [("true", True), ("false", False)])
+def test_list_tasks_overdue_string_matches_bool(raw, flag) -> None:
+    create_task("Water plants", 1, due_date=PAST)
+    assert list_tasks(overdue=raw, today=FIXED_TODAY) == list_tasks(overdue=flag, today=FIXED_TODAY)
+
+def test_list_tasks_overdue_combines_with_priority() -> None:
+    task_id = create_task("Water plants", 1, 2, due_date=PAST)["id"]
+    result = list_tasks(2, overdue=True, today=FIXED_TODAY)
+    assert task_id in _ids(result)
+    assert all(task["priority"] == 2 for task in result)
+    assert task_id not in _ids(list_tasks(4, overdue=True, today=FIXED_TODAY))
+
+@pytest.mark.parametrize("overdue", ["yes", "1", "", 1, "TRUE"])
+def test_list_tasks_invalid_overdue(overdue) -> None:
+    with pytest.raises(ValidationError) as exc_info:
+        list_tasks(overdue=overdue, today=FIXED_TODAY)
+    assert exc_info.value.status_code == 422
+    assert exc_info.value.message == "Invalid overdue: must be true or false"
+
+def test_create_task_route_with_due_date() -> None:
+    response = app.test_client().post(
+        "/api/tasks", json={"title": "Water plants", "user_id": 1, "due_date": "2026-07-01"}
+    )
+    assert response.status_code == 201
+    body = response.get_json()
+    assert body["due_date"] == "2026-07-01"
+    assert get_task(body["id"])["due_date"] == "2026-07-01"
+
+def test_create_task_route_invalid_due_date() -> None:
+    count = len(list_tasks())
+    response = app.test_client().post(
+        "/api/tasks", json={"title": "Water plants", "user_id": 1, "due_date": "2026-02-30"}
+    )
+    assert response.status_code == 422
+    assert "error" in response.get_json()
+    assert len(list_tasks()) == count
+
+def test_update_task_route_due_date_only() -> None:
+    task_id = create_task("Water plants", 1, 2)["id"]
+    response = app.test_client().patch(f"/api/tasks/{task_id}", json={"due_date": "2026-07-01"})
+    assert response.status_code == 200
+    assert response.get_json()["due_date"] == "2026-07-01"
+    assert response.get_json()["priority"] == 2
+
+def test_update_task_route_invalid_due_date() -> None:
+    task_id = create_task("Water plants", 1, due_date="2026-07-01")["id"]
+    response = app.test_client().patch(f"/api/tasks/{task_id}", json={"due_date": "07/01/2026"})
+    assert response.status_code == 422
+    assert "error" in response.get_json()
+    assert get_task(task_id)["due_date"] == "2026-07-01"
+
+def test_update_task_route_null_due_date_clears() -> None:
+    task_id = create_task("Water plants", 1, due_date="2026-07-01")["id"]
+    response = app.test_client().patch(f"/api/tasks/{task_id}", json={"due_date": None})
+    assert response.status_code == 200
+    assert response.get_json()["due_date"] is None
+    assert get_task(task_id)["due_date"] is None
+
+def test_list_tasks_route_overdue(monkeypatch) -> None:
+    monkeypatch.setattr(tasks_service, "_today", lambda: FIXED_TODAY)
+    past_id = create_task("Water plants", 1, due_date=PAST)["id"]
+    future_id = create_task("Feed cat", 1, due_date=FUTURE)["id"]
+    response = app.test_client().get("/api/tasks?overdue=true")
+    assert response.status_code == 200
+    ids = _ids(response.get_json())
+    assert past_id in ids
+    assert future_id not in ids
+    assert not {1, 2, 3} & ids
+    assert ids == _ids(list_tasks(overdue=True, today=FIXED_TODAY))
+
+def test_list_tasks_route_overdue_with_priority(monkeypatch) -> None:
+    monkeypatch.setattr(tasks_service, "_today", lambda: FIXED_TODAY)
+    low_id = create_task("Water plants", 1, 2, due_date=PAST)["id"]
+    high_id = create_task("Feed cat", 1, 4, due_date=PAST)["id"]
+    response = app.test_client().get("/api/tasks?overdue=true&priority=2")
+    assert response.status_code == 200
+    result = response.get_json()
+    assert all(task["priority"] == 2 for task in result)
+    assert low_id in _ids(result)
+    assert high_id not in _ids(result)
+
+def test_list_tasks_route_invalid_overdue(monkeypatch) -> None:
+    monkeypatch.setattr(tasks_service, "_today", lambda: FIXED_TODAY)
+    response = app.test_client().get("/api/tasks?overdue=maybe")
+    assert response.status_code == 422
+    assert "error" in response.get_json()

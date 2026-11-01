@@ -16,7 +16,7 @@ def get_task_route(task_id):
 
 @api.route("/tasks", methods=["GET"])
 def list_tasks_route() -> Response:
-    """List all tasks, optionally filtered by the priority query parameter.
+    """List all tasks, optionally filtered by the priority and overdue query parameters.
 
     Args:
         None.
@@ -26,16 +26,17 @@ def list_tasks_route() -> Response:
 
     Raises:
         ValidationError: If the priority query parameter is not an integer
-            from 1 to 5.
+            from 1 to 5, or the overdue query parameter is not "true" or "false".
     """
-    return jsonify(list_tasks(request.args.get("priority")))
+    return jsonify(list_tasks(request.args.get("priority"), overdue=request.args.get("overdue")))
 
 @api.route("/tasks", methods=["POST"])
 def create_task_route():
     data = request.get_json()
     priority = data.get("priority", DEFAULT_PRIORITY)
     category = data.get("category", DEFAULT_CATEGORY)
-    return jsonify(create_task(data["title"], data["user_id"], priority, category)), 201
+    due_date = data.get("due_date")
+    return jsonify(create_task(data["title"], data["user_id"], priority, category, due_date=due_date)), 201
 
 @api.route("/tasks/<int:task_id>", methods=["PATCH"])
 def update_task_route(task_id: int) -> Response:
