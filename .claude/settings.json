@@ -6,6 +6,12 @@
         "hooks": [
           { "type": "command", "command": "python .claude/hooks/guard_writes.py", "timeout": 10 }
         ]
+      },
+      {
+        "matcher": "Bash|PowerShell",
+        "hooks": [
+          { "type": "command", "command": "python \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/guard_git.py", "timeout": 10 }
+        ]
       }
     ]
   }

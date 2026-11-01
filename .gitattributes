@@ -1,0 +1,2 @@
+#Git hooks must keep LF line endings or Git for Windows cannot run them.
+.githooks/* text eol=lf
