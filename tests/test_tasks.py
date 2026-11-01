@@ -611,3 +611,34 @@ def test_create_task_route_invalid_category(category) -> None:
     assert response.status_code == 422
     assert "error" in response.get_json()
     assert len(list_tasks()) == count
+
+def test_create_task_strips_title_whitespace() -> None:
+    result = create_task("  Water plants \t\n", 1)
+    assert result["title"] == "Water plants"
+    assert get_task(result["id"])["title"] == "Water plants"
+
+def test_create_task_title_max_length_accepted() -> None:
+    title = "a" * 200
+    result = create_task(title, 1)
+    assert result["title"] == title
+
+def test_create_task_title_length_checked_after_strip() -> None:
+    result = create_task("  " + "a" * 200 + "  ", 1)
+    assert result["title"] == "a" * 200
+
+def test_create_task_title_too_long() -> None:
+    count = len(list_tasks())
+    with pytest.raises(ValidationError) as exc_info:
+        create_task("a" * 201, 1)
+    assert exc_info.value.status_code == 422
+    assert exc_info.value.message == "Invalid title: must be at most 200 characters"
+    assert len(list_tasks()) == count
+
+@pytest.mark.parametrize("title", ["", "   ", "\t\n"])
+def test_create_task_empty_title_message(title) -> None:
+    count = len(list_tasks())
+    with pytest.raises(ValidationError) as exc_info:
+        create_task(title, 1)
+    assert exc_info.value.status_code == 422
+    assert exc_info.value.message == "Invalid title: cannot be empty"
+    assert len(list_tasks()) == count
