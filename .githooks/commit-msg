@@ -1,0 +1,36 @@
+#!/bin/sh
+#commit-msg hook for task-manager (PA8 Task 1.3a).
+#Rejects any commit whose subject line is not a conventional commit:
+#type(scope): subject   or   type: subject
+#Allowed types: feat fix docs refactor test chore. Subject line max 72 chars.
+#Exception: git's default merge messages ("Merge branch ...") pass, because
+#our merge rule is "git merge --no-ff, keep the default message".
+
+msg_file="$1"
+types="feat|fix|docs|refactor|test|chore"
+
+#First line that is not a comment or blank; strip Windows CR.
+subject=$(sed -e 's/\r$//' "$msg_file" | grep -v '^#' | grep -v '^[[:space:]]*$' | head -n 1)
+
+fail() {
+    echo "commit-msg: REJECTED: $1" >&2
+    echo "  subject: \"$subject\"" >&2
+    echo "  expected: type(scope): subject  or  type: subject  (types: feat, fix, docs, refactor, test, chore; max 72 chars)" >&2
+    exit 1
+}
+
+[ -n "$subject" ] || fail "empty commit message"
+
+case "$subject" in
+    "Merge "*) exit 0 ;;
+esac
+
+if ! printf '%s\n' "$subject" | grep -Eq "^($types)(\([a-z0-9][a-z0-9-]*\))?: [^ ]"; then
+    fail "subject is not a conventional commit"
+fi
+
+if [ "${#subject}" -gt 72 ]; then
+    fail "subject is ${#subject} characters (max 72)"
+fi
+
+exit 0

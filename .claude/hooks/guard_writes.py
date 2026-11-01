@@ -13,6 +13,8 @@ BLOCKED_PATHS = [
     ".env",                   #Secrets - hard block
     ".claude/settings.json",  #Hook config - agents must not self-modify
     ".claude/hooks/",
+    ".githooks/",             #commit-msg hook - Claude must not weaken it
+    ".git/config",            #holds core.hooksPath
 ]
 
 #Extension 1: destructive Bash commands (word-boundary / token-level regexes).
@@ -86,6 +88,7 @@ def bash_writes_protected(command: str) -> tuple[bool, str]:
     """Return (blocked, reason) if a Bash command writes to a protected path."""
     cmd = command.replace("\\", "/").casefold()
     cmd = re.sub(r"\d*>&\d|\d*>\s*/dev/null", " ", cmd)  #2>&1, >/dev/null are not file writes
+    cmd = re.sub(r"<[^<>\s]+@[^<>\s]+>", " ", cmd)  #<name@email> in a Co-Authored-By trailer is not a redirect
     if not WRITE_OPS.search(cmd):
         return False, ""
     for pattern in BLOCKED_PATHS:

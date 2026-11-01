@@ -42,10 +42,11 @@ Python Flask API for managing tasks and users.
 - Do not change the seed data (USERS in @services/users.py, TASKS in @services/tasks.py) or the constants NOTIFICATION_PREFS, DEFAULT_NOTIFICATION_PREF, and DEFAULT_PRIORITY unless the task explicitly asks; existing tests in @tests/test_tasks.py depend on them.
 
 ## Git Conventions
-- Use conventional commits with one of these types: feat, fix, docs, refactor, test, chore (e.g. `feat: add category field to tasks`)
-- Write the subject in imperative mood and keep it under 72 characters
-- Run `pytest` before every commit
-- Name branches `feat/*`, `fix/*`, or `docs/*`
-- Never force-push to main
-
-
+- Commit subject: `type(scope): subject` or `type: subject`; types: feat, fix, docs, refactor, test, chore. First line at most 72 characters, imperative mood ("add", not "added"), lowercase after the colon, no trailing period.
+- Scopes: `tasks` (services/tasks.py), `users` (services/users.py), `tags` (services/tags.py, schemas/tags.py), `api` (routes/api.py), `errors` (utils/errors.py), `claude` (.claude/, CLAUDE.md), `git` (.githooks/, .gitignore, .gitattributes). Docs-only commits use `docs:` with no scope.
+- Branches: `feat/<topic>`, `fix/<topic>`, `docs/<topic>`; Claude Code worktrees are `worktree-<name>`. Feature and fix work never happens directly on main.
+- Before every commit run `pytest -q`; every test must pass. Commit through `/ship`, which runs the checks and waits for my approval.
+- One logical change per commit; new tests go in the same commit as the code they cover.
+- Merge into main locally with `git merge --no-ff <branch>` and keep git's default `Merge branch ...` message.
+- Never push to main or master, force-push (`--force`, `-f`, `--force-with-lease`), skip hooks (`--no-verify`, `git commit -n`), or change `core.hooksPath`.
+- Never edit `.githooks/`, and never edit an existing test to get a commit or merge through; stop and ask me.
