@@ -116,31 +116,49 @@ def _validate_priority(priority: int) -> None:
         raise ValidationError("priority", "must be an integer between 1 and 5")
 
 def create_task(
-    title: str, user_id: int, priority: int = DEFAULT_PRIORITY, category: str = DEFAULT_CATEGORY
+    title: str,
+    user_id: int,
+    priority: int = DEFAULT_PRIORITY,
+    category: str = DEFAULT_CATEGORY,
+    tags: list[str] | None = None,
 ) -> dict:
     """Create a new task.
 
     Args:
-        title: The title of the task.
+        title: The title of the task. Runs of whitespace are collapsed to a
+            single space, leading and trailing whitespace is removed, and the
+            first letter is capitalized.
         user_id: The unique identifier for the user the task belongs to.
         priority: The priority of the task, from 1 to 5. Defaults to 3.
         category: The category of the task, one of "work", "personal", or
             "other". Defaults to "other".
+        tags: Optional list of tag strings. Tags are lowercased and duplicates
+            are removed, keeping first-seen order. Defaults to no tags.
 
     Returns:
         The newly created task record.
 
     Raises:
         ValidationError: If title is empty or not a string, priority is not an
-            integer from 1 to 5, or category is not one of "work", "personal",
-            or "other".
+            integer from 1 to 5, category is not one of "work", "personal",
+            or "other", tags is not a list of strings, or there are more than
+            5 tags after removing duplicates.
         NotFoundError: If no user exists with the given ID.
     """
     if not isinstance(title, str) or not title.strip():
         raise ValidationError("title", "cannot be empty")
+    title = " ".join(title.split())
+    title = title[0].upper() + title[1:]
     _validate_priority(priority)
     if not isinstance(category, str) or category not in TASK_CATEGORIES:
         raise ValidationError("category", "must be one of: work, personal, other")
+    if tags is None:
+        tags = []
+    if not isinstance(tags, list) or not all(isinstance(tag, str) for tag in tags):
+        raise ValidationError("tags", "must be a list of strings")
+    tags = list(dict.fromkeys(tag.lower() for tag in tags))
+    if len(tags) > 5:
+        raise ValidationError("tags", "must have at most 5 tags")
     get_user(user_id)
     new_id = max(TASKS.keys()) + 1
     TASKS[new_id] = {
@@ -150,6 +168,7 @@ def create_task(
         "user_id": user_id,
         "priority": priority,
         "category": category,
+        "tags": tags,
     }
     return TASKS[new_id]
 

@@ -611,3 +611,60 @@ def test_create_task_route_invalid_category(category) -> None:
     assert response.status_code == 422
     assert "error" in response.get_json()
     assert len(list_tasks()) == count
+
+@pytest.mark.parametrize(
+    "title, expected",
+    [
+        ("water   plants", "Water plants"),
+        ("feed\t\tthe  cat", "Feed the cat"),
+        ("  call   dentist  ", "Call dentist"),
+        ("buy groceries", "Buy groceries"),
+        ("Already Capitalized", "Already Capitalized"),
+        ("iPhone setup", "IPhone setup"),
+        ("2 errands", "2 errands"),
+    ],
+)
+def test_create_task_normalizes_title(title, expected) -> None:
+    result = create_task(title, 1)
+    assert result["title"] == expected
+    assert get_task(result["id"])["title"] == expected
+
+def test_create_task_default_tags() -> None:
+    result = create_task("Water plants", 1)
+    assert result["tags"] == []
+    assert get_task(result["id"])["tags"] == []
+
+def test_create_task_tags_lowercased_and_deduplicated() -> None:
+    result = create_task("Water plants", 1, tags=["Home", "home", "URGENT", "garden", "Urgent"])
+    assert result["tags"] == ["home", "urgent", "garden"]
+    assert get_task(result["id"])["tags"] == ["home", "urgent", "garden"]
+
+def test_create_task_five_tags_allowed() -> None:
+    tags = ["a", "b", "c", "d", "e"]
+    assert create_task("Water plants", 1, tags=tags)["tags"] == tags
+
+def test_create_task_duplicates_do_not_count_toward_limit() -> None:
+    result = create_task("Water plants", 1, tags=["a", "b", "c", "d", "e", "A", "B"])
+    assert result["tags"] == ["a", "b", "c", "d", "e"]
+
+def test_create_task_with_priority_category_and_tags() -> None:
+    result = create_task("Water plants", 1, 5, "work", ["Office"])
+    assert result["priority"] == 5
+    assert result["category"] == "work"
+    assert result["tags"] == ["office"]
+
+@pytest.mark.parametrize(
+    "tags",
+    [["a", "b", "c", "d", "e", "f"], "home", ("home",), {"home"}, [1], ["home", None], [True]],
+)
+def test_create_task_invalid_tags(tags) -> None:
+    count = len(list_tasks())
+    with pytest.raises(ValidationError) as exc_info:
+        create_task("Water plants", 1, tags=tags)
+    assert exc_info.value.status_code == 422
+    assert len(list_tasks()) == count
+
+def test_create_task_too_many_tags_message() -> None:
+    with pytest.raises(ValidationError) as exc_info:
+        create_task("Water plants", 1, tags=["a", "b", "c", "d", "e", "f"])
+    assert exc_info.value.message == "Invalid tags: must have at most 5 tags"
