@@ -4,6 +4,7 @@ from utils.errors import NotFoundError, ValidationError
 DEFAULT_PRIORITY = 3
 TASK_CATEGORIES = ("work", "personal", "other")
 DEFAULT_CATEGORY = "other"
+MAX_TITLE_LENGTH = 200
 
 TASKS: dict[int, dict] = {
     1: {"id": 1, "title": "Buy groceries",  "done": False, "user_id": 1, "priority": 1},
@@ -121,7 +122,8 @@ def create_task(
     """Create a new task.
 
     Args:
-        title: The title of the task.
+        title: The title of the task. Leading and trailing whitespace is
+            stripped before it is validated and stored.
         user_id: The unique identifier for the user the task belongs to.
         priority: The priority of the task, from 1 to 5. Defaults to 3.
         category: The category of the task, one of "work", "personal", or
@@ -131,13 +133,17 @@ def create_task(
         The newly created task record.
 
     Raises:
-        ValidationError: If title is empty or not a string, priority is not an
-            integer from 1 to 5, or category is not one of "work", "personal",
-            or "other".
+        ValidationError: If title is not a string, is empty after stripping,
+            or is longer than 200 characters after stripping, priority is not
+            an integer from 1 to 5, or category is not one of "work",
+            "personal", or "other".
         NotFoundError: If no user exists with the given ID.
     """
     if not isinstance(title, str) or not title.strip():
         raise ValidationError("title", "cannot be empty")
+    title = title.strip()
+    if len(title) > MAX_TITLE_LENGTH:
+        raise ValidationError("title", f"must be at most {MAX_TITLE_LENGTH} characters")
     _validate_priority(priority)
     if not isinstance(category, str) or category not in TASK_CATEGORIES:
         raise ValidationError("category", "must be one of: work, personal, other")
