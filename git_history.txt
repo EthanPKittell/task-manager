@@ -1,0 +1,46 @@
+﻿*   fd90452 Merge branch 'worktree-archiving'
+|\  
+| * a69b259 feat(tasks): add task archiving
+* |   d74e6ad Merge branch 'worktree-due-dates'
+|\ \  
+| |/  
+|/|   
+| * fcfaa8e feat(tasks): add due dates and overdue filter
+|/  
+*   f80c310 Merge branch 'feat/safety-kit'
+|\  
+| * e4221d8 docs: add safety kit writeup with test evidence
+| * bda1393 chore(claude): add git safety hooks and /ship command
+|/  
+*   178f5dc Merge branch 'worktree-normalize-tags'
+|\  
+| * 7979702 feat(tasks): normalize titles and add tags to create_task
+* |   7158ee9 Merge branch 'worktree-validate-title'
+|\ \  
+| |/  
+|/|   
+| * 931777b feat(tasks): strip and length-limit titles in create_task
+|/  
+* 38d952a chore: ignore Claude Code worktrees
+*   c234d69 Merge branch 'feat/task-category-route'
+|\  
+| * d04a520 ix(claude): extend guard hook to PowerShell tool
+| * e4bed28 feat(api): accept category in POST /api/tasks
+|/  
+*   6e6c3b7 Merge branch 'feat/task-category'
+|\  
+| * 0881936 chore(claude): add /commit command
+| * 6dd6785 docs: add git conventions to CLAUDE.md
+| * 20c1bd8 feat: add category field to tasks
+|/  
+* 6aef094 PA7: reflection.md
+* d7f35e2 PA7: part 3 security.md
+* 4e8ab92 PA7: part 1 screenshot
+* 139c70e PA7: added tasks.db and init_db.py
+* 4ab6f06 PA6 Task 3: RETRO and CLAUDE.md audit
+* c493df3 PA6 Task 2: HOOK_LOG
+* 4625bb7 PA6 Task 2: Vector 2 fix
+* 57cb731 PA6 Task 2: Vector 1 fix
+* c42849d PA6 Task 2 part A: Bash and content guards
+* 16efac5 PA6 Task 1: all slash commands + my COMMAND_LOG.md
+* e6a57d9 PA6 Task 1: all commands
