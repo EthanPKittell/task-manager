@@ -156,13 +156,54 @@ def _is_overdue(task: dict, today: date) -> bool:
     due_date = task.get("due_date")
     return due_date is not None and not task["done"] and date.fromisoformat(due_date) < today
 
+def archive_task(task_id: int) -> dict:
+    """Mark a task as archived.
+
+    Args:
+        task_id: The unique identifier for the task.
+
+    Returns:
+        The updated task record as a dictionary.
+
+    Raises:
+        NotFoundError: If no task exists with the given ID.
+    """
+    task = get_task(task_id)
+    task["archived"] = True
+    return task
+
+def _parse_include_archived(value: bool | str | None) -> bool:
+    """Convert an include_archived value to a boolean.
+
+    Args:
+        value: True, False, None, or the string "true" or "false", such as a
+            raw query-string value. None means False.
+
+    Returns:
+        True if archived tasks should be included, otherwise False.
+
+    Raises:
+        ValidationError: If value is not True, False, None, "true", or "false".
+    """
+    if value is None:
+        return False
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str) and value in ("true", "false"):
+        return value == "true"
+    raise ValidationError("include_archived", "must be true or false")
+
 def list_tasks(
     priority: int | str | None = None,
     *,
     overdue: bool | str | None = None,
+    include_archived: bool | str | None = None,
     today: date | None = None,
 ) -> list[dict]:
-    """Retrieve all tasks, optionally filtered by priority and overdue status.
+    """Retrieve tasks, optionally filtered by priority, overdue status and archived state.
+
+    Archived tasks are left out unless include_archived is true. A task with
+    no "archived" key is treated as not archived.
 
     Args:
         priority: The priority to filter by, from 1 to 5. May be an integer or
@@ -172,6 +213,9 @@ def list_tasks(
             (due date before today and not done); False or "false" returns
             only tasks that are not overdue. If None, no overdue filter is
             applied.
+        include_archived: Keyword-only. Whether to include archived tasks. May
+            be True, False, None, or the string "true" or "false". Defaults to
+            None, which means False.
         today: Keyword-only. The date used to decide what is overdue.
             Defaults to the current date.
 
@@ -179,8 +223,9 @@ def list_tasks(
         A list of task records matching every given filter. Empty if none match.
 
     Raises:
-        ValidationError: If priority is not an integer from 1 to 5, or overdue
-            is not True, False, "true", or "false".
+        ValidationError: If priority is not an integer from 1 to 5, overdue
+            is not True, False, None, "true", or "false", or include_archived
+            is not True, False, None, "true", or "false".
     """
     if isinstance(priority, str):
         if not (priority.isascii() and priority.isdigit()):
@@ -189,7 +234,10 @@ def list_tasks(
     if priority is not None:
         _validate_priority(priority)
     overdue = _parse_overdue(overdue)
+    include_archived = _parse_include_archived(include_archived)
     tasks = list(TASKS.values())
+    if not include_archived:
+        tasks = [task for task in tasks if not task.get("archived", False)]
     if priority is not None:
         tasks = [task for task in tasks if task["priority"] == priority]
     if overdue is not None:
